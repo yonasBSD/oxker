@@ -457,7 +457,6 @@ impl AppData {
 
     /// Get all the ContainerItems
     /// Thnk this allow block can be removed with the 1.87 release of Clippy
-    #[allow(clippy::missing_const_for_fn)]
     pub fn get_container_items(&self) -> &[ContainerItem] {
         &self.containers.items
     }
