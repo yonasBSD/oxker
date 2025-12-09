@@ -8,9 +8,15 @@
 </p>
 
 <p align="center">
-	<a href="https://raw.githubusercontent.com/mrjackwills/oxker/main/.github/screenshot_01.png" target='_blank' rel='noopener noreferrer'>
-		<img src='https://raw.githubusercontent.com/mrjackwills/oxker/main/.github/screenshot_01.png' width='60%'/>
+	<a href="https://raw.githubusercontent.com/mrjackwills/oxer/main/.github/demo_01.webp" target='_blank' rel='noopener noreferrer'>
+		<img src='https://raw.githubusercontent.com/mrjackwills/oxker/main/.github/demo_01.webp' width='450px'/>
 	</a>
+	<br>
+	<sub>
+		<a href="https://raw.githubusercontent.com/mrjackwills/oxker/main/.github/screenshot_01.png" target='_blank' rel='noopener noreferrer'>
+			link to alternative screenshot
+		</a>
+	</sub>
 </p>
 
 ## Run
