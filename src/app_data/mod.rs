@@ -896,7 +896,7 @@ impl AppData {
                         if f.starts_with('/') {
                             f.remove(0);
                         }
-                        (*f).to_string()
+                        (*f).clone()
                     })
                 });
 

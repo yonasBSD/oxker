@@ -48,7 +48,7 @@ fn read_docker_host(config: &Config) -> Option<String> {
     config
         .host
         .as_ref()
-        .map_or_else(|| std::env::var(DOCKER_HOST).ok(), |x| Some(x.to_string()))
+        .map_or_else(|| std::env::var(DOCKER_HOST).ok(), |x| Some(x.clone()))
 }
 
 /// Create docker daemon handler, and only spawn up the docker data handler if a ping returns non-error
