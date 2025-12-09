@@ -689,12 +689,11 @@ impl Logs {
                 if let Some(new_index) = match sd {
                     ScrollDirection::Next => current_position.checked_add(1),
                     ScrollDirection::Previous => current_position.checked_sub(1),
-                } {
-                    if let Some(f) = self.search_results.get(new_index) {
+                }
+                    && let Some(f) = self.search_results.get(new_index) {
                         self.lines.state.select(Some(*f));
                         return Some(());
                     }
-                }
             } else {
                 let range = match sd {
                     ScrollDirection::Previous => (0..=current_selected).rev().collect::<Vec<_>>(),
@@ -922,11 +921,10 @@ impl Logs {
     /// Add a padding so one char will always be visilbe?
     pub fn forward(&mut self, width: u16) {
         let offset = usize::from(self.offset);
-        if self.horizontal_scroll_able(width) {
-            if self.adjusted_max_width > 0 && offset < self.adjusted_max_width {
+        if self.horizontal_scroll_able(width)
+            && self.adjusted_max_width > 0 && offset < self.adjusted_max_width {
                 self.offset = self.offset.saturating_add(1);
             }
-        }
     }
 
     /// Reduce the char offset

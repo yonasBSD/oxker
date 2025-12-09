@@ -237,8 +237,8 @@ impl Ui {
                 }
             }
 
-            if crossterm::event::poll(POLL_RATE).unwrap_or(false) {
-                if let Ok(event) = event::read() {
+            if crossterm::event::poll(POLL_RATE).unwrap_or(false)
+                && let Ok(event) = event::read() {
                     if let Event::Key(key) = event {
                         if key.kind == event::KeyEventKind::Press {
                             self.input_tx
@@ -264,7 +264,6 @@ impl Ui {
                         self.gui_state.lock().set_screen_width(width);
                     }
                 }
-            }
             self.check_clear();
         }
         Ok(())

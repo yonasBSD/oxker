@@ -158,8 +158,8 @@ impl From<Option<ConfigKeymap>> for Keymap {
             |vec_str: Option<Vec<String>>,
              keymap_field: &mut (KeyCode, Option<KeyCode>),
              keymap_clash: &mut HashSet<KeyCode>| {
-                if let Some(vec_str) = vec_str {
-                    if let Some(vec_keycode) = Self::try_parse_keycode(&vec_str) {
+                if let Some(vec_str) = vec_str
+                    && let Some(vec_keycode) = Self::try_parse_keycode(&vec_str) {
                         if let Some(first) = vec_keycode.first() {
                             keymap_clash.insert(*first);
                             counter += 1;
@@ -173,7 +173,6 @@ impl From<Option<ConfigKeymap>> for Keymap {
                             keymap_field.1 = None;
                         }
                     }
-                }
             };
 
         if let Some(ck) = value {
@@ -276,8 +275,8 @@ impl Keymap {
 
         for key in input.iter().take(2) {
             if key.chars().count() == 1 {
-                if let Some(first_char) = key.chars().next() {
-                    if let Some(first_char) = match first_char {
+                if let Some(first_char) = key.chars().next()
+                    && let Some(first_char) = match first_char {
                         x if x.is_ascii_alphabetic() || x.is_ascii_digit() => Some(first_char),
                         '/' | '\\' | ',' | '.' | '#' | '\'' | '[' | ']' | ';' | '=' | '-' => {
                             Some(first_char)
@@ -286,7 +285,6 @@ impl Keymap {
                     } {
                         output.push(KeyCode::Char(first_char));
                     }
-                }
             } else {
                 let keycode = match key.to_lowercase().as_str() {
                     "f1" => Some(KeyCode::F(1)),

@@ -178,8 +178,8 @@ impl InputHandler {
     async fn save_logs(&self) -> Result<(), Box<dyn std::error::Error>> {
         let args = self.app_data.lock().config.clone();
         let container = self.app_data.lock().get_selected_container_id_state_name();
-        if let Some((id, _, name)) = container {
-            if let Some(log_path) = args.save_dir {
+        if let Some((id, _, name)) = container
+            && let Some(log_path) = args.save_dir {
                 let (sx, rx) = tokio::sync::oneshot::channel();
                 self.docker_tx.send(DockerMessage::Exec(sx)).await?;
 
@@ -230,7 +230,6 @@ impl InputHandler {
                         .set_info_box(&format!("saved to {}", path.display()));
                 }
             }
-        }
         Ok(())
     }
 

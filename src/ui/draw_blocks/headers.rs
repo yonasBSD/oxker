@@ -39,15 +39,14 @@ fn gen_header<'a>(
 fn gen_header_block<'a>(colors: AppColors, fd: &FrameData, header: Header) -> (Color, &'a str) {
     let mut color = colors.headers_bar.text;
     let mut suffix = "";
-    if let Some((a, b)) = &fd.sorted_by {
-        if &header == a {
+    if let Some((a, b)) = &fd.sorted_by
+        && &header == a {
             match b {
                 SortedOrder::Asc => suffix = " ▲",
                 SortedOrder::Desc => suffix = " ▼",
             }
             color = colors.headers_bar.text_selected;
         }
-    }
 
     (color, suffix)
 }

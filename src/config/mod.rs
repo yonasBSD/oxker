@@ -211,13 +211,12 @@ impl Config {
         let args = Args::parse();
         let config_from_cli = Self::from(&args);
 
-        if let Some(config_file) = &args.config_file {
-            if let Some(config_file) =
+        if let Some(config_file) = &args.config_file
+            && let Some(config_file) =
                 parse_config_file::ConfigFile::try_parse_from_file(config_file)
             {
                 return Self::from(config_file).merge_args(config_from_cli);
             }
-        }
 
         if let Some(config_file) = parse_config_file::ConfigFile::try_parse(in_container) {
             return Self::from(config_file).merge_args(config_from_cli);

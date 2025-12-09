@@ -1,4 +1,3 @@
-#![allow(clippy::collapsible_if)]
 // #![allow(unused)]
 // Zigbuild is stuck on 1.87.0, which means Mac builds won't work when using collapsible ifs
 
@@ -64,8 +63,8 @@ async fn docker_init(
         Docker::connect_with_socket(&host, 120, API_DEFAULT_VERSION)
     });
 
-    if let Ok(docker) = connection {
-        if docker.ping().await.is_ok() {
+    if let Ok(docker) = connection
+        && docker.ping().await.is_ok() {
             tokio::spawn(DockerData::start(
                 Arc::clone(app_data),
                 docker,
@@ -75,7 +74,6 @@ async fn docker_init(
             ));
             return;
         }
-    }
     app_data
         .lock()
         .set_error(AppError::DockerConnect, gui_state, Status::DockerConnect);

@@ -47,11 +47,19 @@ jobs:
       - name: install cross
         run: cargo install cross --git https://github.com/cross-rs/cross
 
-      # Build binary for arm MacOS using Docker Zigbuild
       - name: build
         if: matrix.target == 'aarch64-apple-darwin'
         run: |
-          docker run --rm -v $(pwd):/io -w /io ghcr.io/rust-cross/cargo-zigbuild cargo zigbuild --release --target aarch64-apple-darwin
+          docker run --rm \
+          -v "$(pwd):/io" \
+          -w /io \
+          ghcr.io/rust-cross/cargo-zigbuild \
+          bash -ec '
+            rustup update stable
+            rustup default stable
+            rustup target add aarch64-apple-darwin
+            cargo zigbuild --release --target aarch64-apple-darwin
+          '
      
       # Build all other targets using Cross
       - name: build

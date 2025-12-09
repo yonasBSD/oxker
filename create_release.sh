@@ -232,8 +232,12 @@ cross_build_x86_windows() {
 # Build, using zig-build, for Apple silicon
 zig_build_aarch64_apple() {
 	# mkdir /workspace/oxker/target
-	echo -e "${YELLOW}docker run --rm -v $(pwd):/io -w /io ghcr.io/rust-cross/cargo-zigbuild cargo zigbuild --release --target aarch64-apple-darwin${RESET}"
-	docker run --rm -v "$(pwd):/io" -w /io ghcr.io/rust-cross/cargo-zigbuild cargo zigbuild --release --target aarch64-apple-darwin
+	echo -e "${YELLOW}docker run --rm -v $(pwd):/io -w /io ghcr.io/rust-cross/cargo-zigbuild bash -e -c 'rustup update stable && rustup default stable && rustup target add aarch64-apple-darwin && cargo zigbuild --release --target aarch64-apple-darwin${RESET}"
+
+	docker run --rm -v "$(pwd):/io" -w /io \
+	ghcr.io/rust-cross/cargo-zigbuild \
+	bash -ec 'rustup update stable && rustup default stable && rustup target add aarch64-apple-darwin && cargo zigbuild --release --target aarch64-apple-darwin'
+
 	if ask_yn "sudo chown $(pwd)/target"; then
 		echo -e "${YELLOW}sudo chown -R vscode:vscode $(pwd)/target${RESET}"
 		sudo chown -R vscode:vscode "$(pwd)/target"

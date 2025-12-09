@@ -161,15 +161,15 @@ impl ExecMode {
         let use_cli = app_data.lock().config.use_cli;
         let container = app_data.lock().get_selected_container_id_state_name();
 
-        if let Some((id, state, _)) = container {
-            if [
+        if let Some((id, state, _)) = container
+            && [
                 State::Running(RunningState::Healthy),
                 State::Running(RunningState::Unhealthy),
             ]
             .contains(&state)
             {
-                if tty_readable() && !use_cli {
-                    if let Ok(exec) = docker
+                if tty_readable() && !use_cli
+                    && let Ok(exec) = docker
                         .create_exec(
                             id.get(),
                             CreateExecOptions {
@@ -180,34 +180,24 @@ impl ExecMode {
                             },
                         )
                         .await
-                    {
-                        if let Ok(StartExecResults::Attached { mut output, .. }) =
+                        && let Ok(StartExecResults::Attached { mut output, .. }) =
                             docker.start_exec(&exec.id, None).await
-                        {
-                            if let Some(Ok(msg)) = output.next().await {
-                                if !msg.to_string().starts_with(OCI_ERROR) {
+                            && let Some(Ok(msg)) = output.next().await
+                                && !msg.to_string().starts_with(OCI_ERROR) {
                                     return Some(Self::Internal((
                                         Arc::new(id),
                                         Arc::clone(docker),
                                     )));
                                 }
-                            }
-                        }
-                    }
-                }
 
                 if let Ok(output) = std::process::Command::new(command::DOCKER)
                     .args([command::EXEC, id.get(), command::PWD])
                     .output()
-                {
-                    if let Ok(output) = String::from_utf8(output.stdout) {
-                        if !output.starts_with(OCI_ERROR) {
+                    && let Ok(output) = String::from_utf8(output.stdout)
+                        && !output.starts_with(OCI_ERROR) {
                             return Some(Self::External(Arc::new(id)));
                         }
-                    }
-                }
             }
-        }
         None
     }
 

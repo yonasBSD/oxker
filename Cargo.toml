@@ -7,8 +7,7 @@ description = "A simple tui to view & control docker containers"
 repository = "https://github.com/mrjackwills/oxker"
 homepage = "https://github.com/mrjackwills/oxker"
 license = "MIT"
-# This is stuck to whatever version cargo-zigbuild is using - https://github.com/rust-cross/cargo-zigbuild/blob/main/Dockerfile
-rust-version = "1.87.0"
+rust-version = "1.90.0"
 readme = "README.md"
 keywords = ["docker", "tui", "tokio", "terminal", "podman"]
 categories = ["command-line-utilities"]
