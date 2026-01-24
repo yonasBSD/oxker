@@ -16,8 +16,6 @@ categories = ["command-line-utilities"]
 unsafe_code = "forbid"
 
 [lints.clippy]
-nursery = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
 expect_used = "warn"
 todo = "warn"
 unused_async = "warn"
@@ -28,7 +26,7 @@ similar_names = "allow"
 
 [dependencies]
 anyhow = "1.0"
-bollard = "0.19"
+bollard = "0.20"
 cansi = "2.2"
 clap = { version = "4.5", features = ["color", "derive", "unicode"] }
 crossterm = "0.29"
@@ -36,11 +34,11 @@ directories = "6.0"
 futures-util = "0.3"
 jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
 parking_lot = { version = "0.12" }
-ratatui = "0.29"
+ratatui = "0.30"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_jsonc = "1.0"
-tokio = { version = "1.48", features = ["full"] }
+tokio = { version = "1.49", features = ["full"] }
 tokio-util = "0.7"
 toml = { version = "0.9", default-features = false, features = ["parse", "serde"] }
 tracing = "0.1"

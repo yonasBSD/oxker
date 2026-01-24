@@ -5,7 +5,7 @@ use std::{
     net::IpAddr,
 };
 
-use bollard::service::Port;
+use bollard::secret::{ContainerSummaryHealthStatusEnum, PortSummary};
 use jiff::{Timestamp, tz::TimeZone};
 use ratatui::{
     layout::Size,
@@ -121,8 +121,8 @@ pub struct ContainerPorts {
     pub public: Option<u16>,
 }
 
-impl From<Port> for ContainerPorts {
-    fn from(value: Port) -> Self {
+impl From<PortSummary> for ContainerPorts {
+    fn from(value: PortSummary) -> Self {
         Self {
             ip: value.ip.and_then(|i| i.parse::<IpAddr>().ok()),
             private: value.private_port,
@@ -242,6 +242,7 @@ impl From<String> for ContainerStatus {
 
 impl ContainerStatus {
     /// Check if a container is unhealthy
+    /// TODO should have a healthy Option<X> part now, so no need to parse
     pub fn unhealthy(&self) -> bool {
         self.contains("(unhealthy)")
     }
@@ -689,11 +690,11 @@ impl Logs {
                 if let Some(new_index) = match sd {
                     ScrollDirection::Next => current_position.checked_add(1),
                     ScrollDirection::Previous => current_position.checked_sub(1),
+                } && let Some(f) = self.search_results.get(new_index)
+                {
+                    self.lines.state.select(Some(*f));
+                    return Some(());
                 }
-                    && let Some(f) = self.search_results.get(new_index) {
-                        self.lines.state.select(Some(*f));
-                        return Some(());
-                    }
             } else {
                 let range = match sd {
                     ScrollDirection::Previous => (0..=current_selected).rev().collect::<Vec<_>>(),
@@ -922,9 +923,11 @@ impl Logs {
     pub fn forward(&mut self, width: u16) {
         let offset = usize::from(self.offset);
         if self.horizontal_scroll_able(width)
-            && self.adjusted_max_width > 0 && offset < self.adjusted_max_width {
-                self.offset = self.offset.saturating_add(1);
-            }
+            && self.adjusted_max_width > 0
+            && offset < self.adjusted_max_width
+        {
+            self.offset = self.offset.saturating_add(1);
+        }
     }
 
     /// Reduce the char offset
@@ -968,6 +971,7 @@ pub struct ContainerItem {
     pub cpu_stats: VecDeque<CpuStats>,
     pub created: u64,
     pub docker_controls: StatefulList<DockerCommand>,
+    pub health: Option<ContainerSummaryHealthStatusEnum>,
     pub id: ContainerId,
     pub image: ContainerImage,
     pub is_oxker: bool,
@@ -1017,6 +1021,7 @@ impl ContainerItem {
             cpu_stats: VecDeque::with_capacity(60),
             created,
             docker_controls,
+            health: None,
             id,
             image: image.into(),
             is_oxker,

@@ -64,16 +64,17 @@ async fn docker_init(
     });
 
     if let Ok(docker) = connection
-        && docker.ping().await.is_ok() {
-            tokio::spawn(DockerData::start(
-                Arc::clone(app_data),
-                docker,
-                docker_rx,
-                docker_tx,
-                Arc::clone(gui_state),
-            ));
-            return;
-        }
+        && docker.ping().await.is_ok()
+    {
+        tokio::spawn(DockerData::start(
+            Arc::clone(app_data),
+            docker,
+            docker_rx,
+            docker_tx,
+            Arc::clone(gui_state),
+        ));
+        return;
+    }
     app_data
         .lock()
         .set_error(AppError::DockerConnect, gui_state, Status::DockerConnect);
@@ -153,7 +154,7 @@ mod tests {
 
     use std::{str::FromStr, sync::Arc};
 
-    use bollard::service::{ContainerSummary, Port};
+    use bollard::service::{ContainerSummary, PortSummary};
 
     use crate::{
         app_data::{
@@ -232,13 +233,14 @@ mod tests {
     pub fn gen_container_summary(index: usize, state: &str) -> ContainerSummary {
         ContainerSummary {
             image_manifest_descriptor: None,
+            health: None,
             id: Some(format!("{index}")),
             names: Some(vec![format!("container_{}", index)]),
             image: Some(format!("image_{index}")),
             image_id: Some(format!("{index}")),
             command: None,
             created: Some(i64::try_from(index).unwrap()),
-            ports: Some(vec![Port {
+            ports: Some(vec![PortSummary {
                 ip: None,
                 private_port: u16::try_from(index).unwrap_or(1) + 8000,
                 public_port: None,
