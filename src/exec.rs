@@ -167,37 +167,37 @@ impl ExecMode {
                 State::Running(RunningState::Unhealthy),
             ]
             .contains(&state)
+        {
+            if tty_readable()
+                && !use_cli
+                && let Ok(exec) = docker
+                    .create_exec(
+                        id.get(),
+                        CreateExecOptions {
+                            attach_stdout: Some(true),
+                            attach_stderr: Some(true),
+                            cmd: Some(vec![command::PWD]),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                && let Ok(StartExecResults::Attached { mut output, .. }) =
+                    docker.start_exec(&exec.id, None).await
+                && let Some(Ok(msg)) = output.next().await
+                && !msg.to_string().starts_with(OCI_ERROR)
             {
-                if tty_readable() && !use_cli
-                    && let Ok(exec) = docker
-                        .create_exec(
-                            id.get(),
-                            CreateExecOptions {
-                                attach_stdout: Some(true),
-                                attach_stderr: Some(true),
-                                cmd: Some(vec![command::PWD]),
-                                ..Default::default()
-                            },
-                        )
-                        .await
-                        && let Ok(StartExecResults::Attached { mut output, .. }) =
-                            docker.start_exec(&exec.id, None).await
-                            && let Some(Ok(msg)) = output.next().await
-                                && !msg.to_string().starts_with(OCI_ERROR) {
-                                    return Some(Self::Internal((
-                                        Arc::new(id),
-                                        Arc::clone(docker),
-                                    )));
-                                }
-
-                if let Ok(output) = std::process::Command::new(command::DOCKER)
-                    .args([command::EXEC, id.get(), command::PWD])
-                    .output()
-                    && let Ok(output) = String::from_utf8(output.stdout)
-                        && !output.starts_with(OCI_ERROR) {
-                            return Some(Self::External(Arc::new(id)));
-                        }
+                return Some(Self::Internal((Arc::new(id), Arc::clone(docker))));
             }
+
+            if let Ok(output) = std::process::Command::new(command::DOCKER)
+                .args([command::EXEC, id.get(), command::PWD])
+                .output()
+                && let Ok(output) = String::from_utf8(output.stdout)
+                && !output.starts_with(OCI_ERROR)
+            {
+                return Some(Self::External(Arc::new(id)));
+            }
+        }
         None
     }
 

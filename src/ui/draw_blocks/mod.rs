@@ -104,11 +104,12 @@ fn generate_block<'a>(
         .title(ratatui::text::Line::from(title).left_aligned());
 
     if panel == SelectablePanel::Logs
-        && let Some(x) = fd.scroll_title.as_ref() {
-            block = block
-                .title_bottom(x.to_owned())
-                .title_alignment(ratatui::layout::Alignment::Right);
-        }
+        && let Some(x) = fd.scroll_title.as_ref()
+    {
+        block = block
+            .title_bottom(x.to_owned())
+            .title_alignment(ratatui::layout::Alignment::Right);
+    }
     if !fd.status.contains(&Status::Filter) {
         if fd.selected_panel == panel {
             block = block.border_style(Style::default().fg(colors.borders.selected));

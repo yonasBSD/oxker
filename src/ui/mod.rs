@@ -238,32 +238,33 @@ impl Ui {
             }
 
             if crossterm::event::poll(POLL_RATE).unwrap_or(false)
-                && let Ok(event) = event::read() {
-                    if let Event::Key(key) = event {
-                        if key.kind == event::KeyEventKind::Press {
+                && let Ok(event) = event::read()
+            {
+                if let Event::Key(key) = event {
+                    if key.kind == event::KeyEventKind::Press {
+                        self.input_tx
+                            .send(InputMessages::ButtonPress((key.code, key.modifiers)))
+                            .await
+                            .ok();
+                    }
+                } else if let Event::Mouse(m) = event {
+                    match m.kind {
+                        event::MouseEventKind::Down(_)
+                        | event::MouseEventKind::ScrollDown
+                        | event::MouseEventKind::ScrollUp => {
                             self.input_tx
-                                .send(InputMessages::ButtonPress((key.code, key.modifiers)))
+                                .send(InputMessages::MouseEvent((m, m.modifiers)))
                                 .await
                                 .ok();
                         }
-                    } else if let Event::Mouse(m) = event {
-                        match m.kind {
-                            event::MouseEventKind::Down(_)
-                            | event::MouseEventKind::ScrollDown
-                            | event::MouseEventKind::ScrollUp => {
-                                self.input_tx
-                                    .send(InputMessages::MouseEvent((m, m.modifiers)))
-                                    .await
-                                    .ok();
-                            }
-                            _ => (),
-                        }
-                    } else if let Event::Resize(width, _) = event {
-                        self.gui_state.lock().clear_area_map();
-                        self.terminal.autoresize().ok();
-                        self.gui_state.lock().set_screen_width(width);
+                        _ => (),
                     }
+                } else if let Event::Resize(width, _) = event {
+                    self.gui_state.lock().clear_area_map();
+                    self.terminal.autoresize().ok();
+                    self.gui_state.lock().set_screen_width(width);
                 }
+            }
             self.check_clear();
         }
         Ok(())

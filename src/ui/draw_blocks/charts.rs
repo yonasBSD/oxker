@@ -194,42 +194,41 @@ mod tests {
     ];
 
     // co-ordinates of the dots from the cpu chart
-    const CPU_XY: [(usize, usize); 15] = [
-        (1, 12),
-        (2, 11),
+    const CPU_XY: [(usize, usize); 16] = [
+        (1, 13),
         (2, 12),
-        (3, 10),
+        (2, 13),
         (3, 11),
-        (3, 12),
-        (4, 10),
-        (4, 12),
-        (5, 9),
+        (3, 13),
+        (4, 11),
+        (4, 13),
+        (5, 10),
         (5, 13),
-        (5, 14),
-        (6, 8),
+        (6, 9),
         (6, 13),
+        (6, 14),
         (7, 8),
+        (7, 9),
         (7, 13),
+        (7, 14),
     ];
 
     // co-ordinates of the dots from the memory chart
-    const MEM_XY: [(usize, usize); 16] = [
-        (1, 54),
+    const MEM_XY: [(usize, usize); 14] = [
         (1, 55),
         (2, 54),
         (2, 55),
-        (3, 53),
+        (3, 54),
         (3, 55),
-        (4, 52),
+        (4, 53),
         (4, 55),
-        (5, 51),
         (5, 52),
-        (5, 55),
+        (5, 53),
         (5, 56),
-        (6, 51),
-        (6, 55),
+        (6, 52),
+        (6, 56),
         (7, 51),
-        (7, 55),
+        (7, 56),
     ];
 
     #[test]
@@ -336,6 +335,7 @@ mod tests {
             .unwrap();
 
         assert_snapshot!(setup.terminal.backend());
+        //
 
         for (row_index, result_row) in get_result(&setup) {
             for (result_cell_index, result_cell) in result_row.iter().enumerate() {

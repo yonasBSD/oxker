@@ -173,9 +173,10 @@ impl AppData {
 
     pub fn log_search_scroll(&mut self, np: &ScrollDirection) {
         if let Some(i) = self.get_mut_selected_container()
-            && i.logs.search_scroll(np).is_some() {
-                self.rerender.update_draw();
-            }
+            && i.logs.search_scroll(np).is_some()
+        {
+            self.rerender.update_draw();
+        }
     }
 
     pub fn gen_log_search(&self) -> Option<LogSearch> {
@@ -340,12 +341,13 @@ impl AppData {
     pub fn set_sort_by_header(&mut self, selected_header: Header) {
         let mut output = Some((selected_header, SortedOrder::Asc));
         if let Some((current_header, order)) = self.get_sorted()
-            && current_header == selected_header {
-                match order {
-                    SortedOrder::Desc => output = None,
-                    SortedOrder::Asc => output = Some((selected_header, SortedOrder::Desc)),
-                }
+            && current_header == selected_header
+        {
+            match order {
+                SortedOrder::Desc => output = None,
+                SortedOrder::Asc => output = Some((selected_header, SortedOrder::Desc)),
             }
+        }
         self.set_sorted(output);
     }
 

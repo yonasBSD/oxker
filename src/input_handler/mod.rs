@@ -179,57 +179,58 @@ impl InputHandler {
         let args = self.app_data.lock().config.clone();
         let container = self.app_data.lock().get_selected_container_id_state_name();
         if let Some((id, _, name)) = container
-            && let Some(log_path) = args.save_dir {
-                let (sx, rx) = tokio::sync::oneshot::channel();
-                self.docker_tx.send(DockerMessage::Exec(sx)).await?;
+            && let Some(log_path) = args.save_dir
+        {
+            let (sx, rx) = tokio::sync::oneshot::channel();
+            self.docker_tx.send(DockerMessage::Exec(sx)).await?;
 
-                let now = SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .map_or(0, |i| i.as_secs());
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map_or(0, |i| i.as_secs());
 
-                let path = log_path.join(format!("{name}_{now}.log"));
+            let path = log_path.join(format!("{name}_{now}.log"));
 
-                let options = Some(LogsOptions {
-                    stderr: true,
-                    stdout: true,
-                    timestamps: args.show_timestamp,
-                    since: 0,
-                    ..Default::default()
-                });
-                let mut logs = rx.await?.logs(id.get(), options);
-                let mut output = vec![];
+            let options = Some(LogsOptions {
+                stderr: true,
+                stdout: true,
+                timestamps: args.show_timestamp,
+                since: 0,
+                ..Default::default()
+            });
+            let mut logs = rx.await?.logs(id.get(), options);
+            let mut output = vec![];
 
-                while let Some(Ok(value)) = logs.next().await {
-                    let data = value.to_string();
-                    if !data.trim().is_empty() {
-                        output.push(
-                            categorise_text(&data)
-                                .into_iter()
-                                .map(|i| i.text)
-                                .collect::<String>(),
-                        );
-                    }
-                }
-                if !output.is_empty() {
-                    let mut stream = BufWriter::new(
-                        OpenOptions::new()
-                            .read(true)
-                            .write(true)
-                            .create(true)
-                            .truncate(true)
-                            .open(&path)?,
+            while let Some(Ok(value)) = logs.next().await {
+                let data = value.to_string();
+                if !data.trim().is_empty() {
+                    output.push(
+                        categorise_text(&data)
+                            .into_iter()
+                            .map(|i| i.text)
+                            .collect::<String>(),
                     );
-
-                    for line in &output {
-                        stream.write_all(line.as_bytes())?;
-                    }
-                    stream.flush()?;
-
-                    self.gui_state
-                        .lock()
-                        .set_info_box(&format!("saved to {}", path.display()));
                 }
             }
+            if !output.is_empty() {
+                let mut stream = BufWriter::new(
+                    OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .create(true)
+                        .truncate(true)
+                        .open(&path)?,
+                );
+
+                for line in &output {
+                    stream.write_all(line.as_bytes())?;
+                }
+                stream.flush()?;
+
+                self.gui_state
+                    .lock()
+                    .set_info_box(&format!("saved to {}", path.display()));
+            }
+        }
         Ok(())
     }
 

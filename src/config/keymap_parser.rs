@@ -159,20 +159,21 @@ impl From<Option<ConfigKeymap>> for Keymap {
              keymap_field: &mut (KeyCode, Option<KeyCode>),
              keymap_clash: &mut HashSet<KeyCode>| {
                 if let Some(vec_str) = vec_str
-                    && let Some(vec_keycode) = Self::try_parse_keycode(&vec_str) {
-                        if let Some(first) = vec_keycode.first() {
-                            keymap_clash.insert(*first);
-                            counter += 1;
-                            keymap_field.0 = *first;
-                        }
-                        if let Some(second) = vec_keycode.get(1) {
-                            keymap_clash.insert(*second);
-                            counter += 1;
-                            keymap_field.1 = Some(*second);
-                        } else {
-                            keymap_field.1 = None;
-                        }
+                    && let Some(vec_keycode) = Self::try_parse_keycode(&vec_str)
+                {
+                    if let Some(first) = vec_keycode.first() {
+                        keymap_clash.insert(*first);
+                        counter += 1;
+                        keymap_field.0 = *first;
                     }
+                    if let Some(second) = vec_keycode.get(1) {
+                        keymap_clash.insert(*second);
+                        counter += 1;
+                        keymap_field.1 = Some(*second);
+                    } else {
+                        keymap_field.1 = None;
+                    }
+                }
             };
 
         if let Some(ck) = value {
@@ -282,9 +283,10 @@ impl Keymap {
                             Some(first_char)
                         }
                         _ => None,
-                    } {
-                        output.push(KeyCode::Char(first_char));
                     }
+                {
+                    output.push(KeyCode::Char(first_char));
+                }
             } else {
                 let keycode = match key.to_lowercase().as_str() {
                     "f1" => Some(KeyCode::F(1)),
