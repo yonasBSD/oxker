@@ -79,8 +79,6 @@ pub struct ConfigFile {
     pub use_cli: Option<bool>,
 }
 
-
-
 impl ConfigFile {
     /// Attempt to create a config.toml file, will attempt to recursively create the directories as well
     fn crate_config_file(in_container: bool) -> Result<(), AppError> {
@@ -122,7 +120,7 @@ impl ConfigFile {
             }
         }
 
-		// TODO if on windows, omit the docker_host?
+        // TODO if on windows, omit the docker_host?
     }
 
     /// Read the config file path to string, then attempt to parse

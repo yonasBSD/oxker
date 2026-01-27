@@ -10,13 +10,10 @@ use bollard::{
 use futures_util::StreamExt;
 use parking_lot::Mutex;
 use std::{
-    collections::HashMap,
+    collections::HashSet,
     sync::{Arc, atomic::AtomicUsize},
 };
-use tokio::{
-    sync::mpsc::{Receiver, Sender},
-    task::JoinHandle,
-};
+use tokio::sync::mpsc::{Receiver, Sender};
 use uuid::Uuid;
 
 use crate::{
@@ -70,7 +67,7 @@ pub struct DockerData {
     docker: Arc<Docker>,
     gui_state: Arc<Mutex<GuiState>>,
     receiver: Receiver<DockerMessage>,
-    spawns: Arc<Mutex<HashMap<SpawnId, JoinHandle<()>>>>,
+    spawns: Arc<Mutex<HashSet<SpawnId>>>,
 }
 
 impl DockerData {
@@ -132,7 +129,7 @@ impl DockerData {
         docker: Arc<Docker>,
         state: State,
         spawn_id: SpawnId,
-        spawns: Arc<Mutex<HashMap<SpawnId, JoinHandle<()>>>>,
+        spawns: Arc<Mutex<HashSet<SpawnId>>>,
     ) {
         let id = spawn_id.get_id();
         let mut stream = docker
@@ -200,17 +197,13 @@ impl DockerData {
         for (state, id) in all_ids {
             let spawn_id = SpawnId::Stats((id, self.binate));
 
-            if let std::collections::hash_map::Entry::Vacant(spawns) =
-                self.spawns.lock().entry(spawn_id.clone())
-            {
-                // TODO Replace this with toktio tokens
-                spawns.insert(tokio::spawn(Self::update_container_stat(
-                    Arc::clone(&self.app_data),
-                    Arc::clone(&self.docker),
-                    state,
-                    spawn_id,
-                    Arc::clone(&self.spawns),
-                )));
+            if !self.spawns.lock().contains(&spawn_id) {
+                let app_data = Arc::clone(&self.app_data);
+                let docker = Arc::clone(&self.docker);
+                let spawns = Arc::clone(&self.spawns);
+                tokio::spawn(Self::update_container_stat(
+                    app_data, docker, state, spawn_id, spawns,
+                ));
             }
         }
         self.binate = self.binate.toggle();
@@ -257,7 +250,7 @@ impl DockerData {
         docker: Arc<Docker>,
         id: ContainerId,
         since: u64,
-        spawns: Arc<Mutex<HashMap<SpawnId, JoinHandle<()>>>>,
+        spawns: Arc<Mutex<HashSet<SpawnId>>>,
         stderr: bool,
     ) {
         let options = Some(LogsOptions {
@@ -291,13 +284,13 @@ impl DockerData {
             let spawns = Arc::clone(&self.spawns);
             let std_err = self.config.show_std_err;
             let init = Arc::clone(&init);
-            self.spawns.lock().insert(
-                SpawnId::Log(id.clone()),
-                tokio::spawn(async move {
-                    Self::update_log(app_data, docker, id, 0, spawns, std_err).await;
-                    init.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                }),
-            );
+
+            self.spawns.lock().insert(SpawnId::Log(id.clone()));
+
+            tokio::spawn(async move {
+                Self::update_log(app_data, docker, id, 0, spawns, std_err).await;
+                init.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            });
         }
         init
     }
@@ -328,17 +321,16 @@ impl DockerData {
             let last_updated = container.last_updated;
             let spawn_id = SpawnId::Log(container.id.clone());
             // Only spawn if not already spawned with a given id/binate pair
-            if let std::collections::hash_map::Entry::Vacant(spawns) =
-                self.spawns.lock().entry(spawn_id)
-            {
-                spawns.insert(tokio::spawn(Self::update_log(
+            if !self.spawns.lock().contains(&spawn_id) {
+                self.spawns.lock().insert(spawn_id.clone());
+                tokio::spawn(Self::update_log(
                     Arc::clone(&self.app_data),
                     Arc::clone(&self.docker),
                     container.id.clone(),
                     last_updated,
                     Arc::clone(&self.spawns),
                     self.config.show_std_err,
-                )));
+                ));
             }
         }
         self.update_all_container_stats();
@@ -458,7 +450,7 @@ impl DockerData {
                 docker: Arc::new(docker),
                 gui_state,
                 receiver: docker_rx,
-                spawns: Arc::new(Mutex::new(HashMap::new())),
+                spawns: Arc::new(Mutex::new(HashSet::new())),
             };
             inner.initialise_container_data().await;
             Self::heartbeat(&inner.config, docker_tx);

@@ -141,7 +141,7 @@ mod tests {
         }
     }
 
-	    #[test]
+    #[test]
     /// Test that the error popup is centered, red background, white border, white text, and displays the correct text with the custom docker host address
     fn test_draw_blocks_error_docker_connect_error_custom_host() {
         let mut setup = test_setup(46, 9, true, true);
