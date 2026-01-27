@@ -242,7 +242,6 @@ impl From<String> for ContainerStatus {
 
 impl ContainerStatus {
     /// Check if a container is unhealthy
-    /// TODO should have a healthy Option<X> part now, so no need to parse
     pub fn unhealthy(&self) -> bool {
         self.contains("(unhealthy)")
     }

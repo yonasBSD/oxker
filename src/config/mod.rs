@@ -13,9 +13,6 @@ pub use {color_parser::AppColors, keymap_parser::Keymap};
 mod parse_args;
 mod parse_config_file;
 
-// TODO use a global pub static oncelock for the config
-// static CELL: OnceLock<usize> = OnceLock::new();
-
 #[derive(Debug, Clone)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Config {
