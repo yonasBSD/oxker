@@ -22,6 +22,7 @@ pub fn draw(
     colors: AppColors,
     error: &AppError,
     f: &mut Frame,
+    host: Option<String>,
     keymap: &Keymap,
     seconds: Option<u8>,
 ) {
@@ -32,11 +33,17 @@ pub fn draw(
         .borders(Borders::ALL);
 
     let to_push = if matches!(error, AppError::DockerConnect) {
+        let s = if let Some(host) = host {
+            format!(" @ \"{host}\"")
+        } else {
+            String::new()
+        };
         format!(
-            "\n\n {}::v{} closing in {:02} seconds",
+            "{}\n\n {}::v{} closing in {:02} seconds",
+            s,
             NAME,
             VERSION,
-            seconds.unwrap_or(5)
+            seconds.unwrap_or(5),
         )
     } else {
         let clear_text = if keymap.clear == Keymap::new().clear {
@@ -107,6 +114,37 @@ mod tests {
     /// Test that the error popup is centered, red background, white border, white text, and displays the correct text
     fn test_draw_blocks_error_docker_connect_error() {
         let mut setup = test_setup(46, 9, true, true);
+        setup
+            .terminal
+            .draw(|f| {
+                super::draw(
+                    AppColors::new(),
+                    &AppError::DockerConnect,
+                    f,
+                    None,
+                    &Keymap::new(),
+                    Some(4),
+                );
+            })
+            .unwrap();
+        assert_snapshot!(setup.terminal.backend());
+        for (row_index, result_row) in get_result(&setup) {
+            for (result_cell_index, result_cell) in result_row.iter().enumerate() {
+                if let (0 | 8, _) = (row_index, result_cell_index) {
+                    assert_eq!(result_cell.bg, Color::Reset);
+                    assert_eq!(result_cell.fg, Color::Reset);
+                } else {
+                    assert_eq!(result_cell.bg, Color::Red);
+                    assert_eq!(result_cell.fg, Color::White);
+                }
+            }
+        }
+    }
+
+	    #[test]
+    /// Test that the error popup is centered, red background, white border, white text, and displays the correct text with the custom docker host address
+    fn test_draw_blocks_error_docker_connect_error_custom_host() {
+        let mut setup = test_setup(46, 9, true, true);
 
         setup
             .terminal
@@ -115,6 +153,7 @@ mod tests {
                     AppColors::new(),
                     &AppError::DockerConnect,
                     f,
+                    Some("/test/host.sock".to_owned()),
                     &Keymap::new(),
                     Some(4),
                 );
@@ -146,6 +185,8 @@ mod tests {
                     AppColors::new(),
                     &AppError::DockerExec,
                     f,
+                    // TODO test me
+                    None,
                     &Keymap::new(),
                     Some(4),
                 );
@@ -183,7 +224,15 @@ mod tests {
         setup
             .terminal
             .draw(|f| {
-                super::draw(colors, &AppError::DockerExec, f, &Keymap::new(), Some(4));
+                // TODO test me
+                super::draw(
+                    colors,
+                    &AppError::DockerExec,
+                    f,
+                    None,
+                    &Keymap::new(),
+                    Some(4),
+                );
             })
             .unwrap();
 
@@ -218,7 +267,15 @@ mod tests {
         setup
             .terminal
             .draw(|f| {
-                super::draw(AppColors::new(), &AppError::DockerExec, f, &keymap, None);
+                // TODO test me
+                super::draw(
+                    AppColors::new(),
+                    &AppError::DockerExec,
+                    f,
+                    None,
+                    &keymap,
+                    None,
+                );
             })
             .unwrap();
         assert_snapshot!(setup.terminal.backend());
@@ -235,7 +292,15 @@ mod tests {
         setup
             .terminal
             .draw(|f| {
-                super::draw(AppColors::new(), &AppError::DockerExec, f, &keymap, None);
+                // TODO test me
+                super::draw(
+                    AppColors::new(),
+                    &AppError::DockerExec,
+                    f,
+                    None,
+                    &keymap,
+                    None,
+                );
             })
             .unwrap();
         assert_snapshot!(setup.terminal.backend());
@@ -252,7 +317,15 @@ mod tests {
         setup
             .terminal
             .draw(|f| {
-                super::draw(AppColors::new(), &AppError::DockerExec, f, &keymap, None);
+                // TODO test me
+                super::draw(
+                    AppColors::new(),
+                    &AppError::DockerExec,
+                    f,
+                    None,
+                    &keymap,
+                    None,
+                );
             })
             .unwrap();
         assert_snapshot!(setup.terminal.backend());

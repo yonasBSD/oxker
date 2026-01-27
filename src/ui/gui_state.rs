@@ -160,10 +160,10 @@ const FRAMES_LEN: u8 = 9;
 
 /// The application gui state can be in multiple of these four states at the same time
 /// Various functions (e.g input handler), operate differently depending upon current Status
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Status {
     DeleteConfirm,
-    DockerConnect,
+    DockerConnect(Option<String>),
     Error,
     Exec,
     Filter,

@@ -18,8 +18,8 @@
 	"show_timestamp": true,
 	// Don't draw gui - for debugging - mostly pointless
 	"gui": true,
-	// Docker host location
-	"host": "/var/run/docker.sock",
+	// Docker host location. Will take priority over a DOCKER_HOST env.
+	// "host": "/var/run/docker.sock",
 	// Display the timestamp in a custom format, if given option is invalid, it will default to %Y-%m-%dT%H:%M:%S.%8f -> 2025-02-18T12:34:56.01234567
 	// *Should* accept any valid strftime string up to 32 chars, see https://strftime.org/
 	"timestamp_format": "%Y-%m-%dT%H:%M:%S.%8f",

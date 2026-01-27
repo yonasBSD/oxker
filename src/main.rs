@@ -42,12 +42,16 @@ fn setup_tracing() {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 }
 
-/// Read the optional docker_host path, the cli args take priority over the DOCKER_HOST env
+/// Read the optional docker_host path,  the DOCKER_HOST env take priority over cli or config
+/// Bollard will use DOCKER_HOST env, so might be pointless here, although it will fix it's priority over any config setting
 fn read_docker_host(config: &Config) -> Option<String> {
-    config
-        .host
-        .as_ref()
-        .map_or_else(|| std::env::var(DOCKER_HOST).ok(), |x| Some(x.clone()))
+    if let Ok(env) = std::env::var(DOCKER_HOST)
+        && !env.trim().is_empty()
+    {
+        Some(env)
+    } else {
+        config.host.as_ref().cloned()
+    }
 }
 
 /// Create docker daemon handler, and only spawn up the docker data handler if a ping returns non-error
@@ -59,11 +63,11 @@ async fn docker_init(
 ) {
     let host = read_docker_host(&app_data.lock().config);
 
-    let connection = host.map_or_else(Docker::connect_with_socket_defaults, |host| {
-        Docker::connect_with_socket(&host, 120, API_DEFAULT_VERSION)
-    });
-
-    if let Ok(docker) = connection
+    if let Ok(docker) = host
+        .as_ref()
+        .map_or_else(Docker::connect_with_defaults, |host| {
+            Docker::connect_with_socket(host, 120, API_DEFAULT_VERSION)
+        })
         && docker.ping().await.is_ok()
     {
         tokio::spawn(DockerData::start(
@@ -73,11 +77,13 @@ async fn docker_init(
             docker_tx,
             Arc::clone(gui_state),
         ));
-        return;
+    } else {
+        app_data.lock().set_error(
+            AppError::DockerConnect,
+            gui_state,
+            Status::DockerConnect(host),
+        );
     }
-    app_data
-        .lock()
-        .set_error(AppError::DockerConnect, gui_state, Status::DockerConnect);
 }
 
 /// Create data for, and then spawn a tokio thread, for the input handler

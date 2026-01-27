@@ -132,7 +132,7 @@ impl Ui {
     }
 
     /// Draw the the error message ui, for 5 seconds, with a countdown
-    fn err_loop(&mut self) -> Result<(), AppError> {
+    fn err_loop(&mut self, host: Option<String>) -> Result<(), AppError> {
         let mut seconds = 5;
         let colors = self.app_data.lock().config.app_colors;
         let keymap = self.app_data.lock().config.keymap.clone();
@@ -155,6 +155,7 @@ impl Ui {
                             colors,
                             &AppError::DockerConnect,
                             f,
+                            host.clone(),
                             &keymap,
                             Some(seconds),
                         );
@@ -273,8 +274,11 @@ impl Ui {
     /// Draw either the Error, or main oxker ui, to the terminal
     async fn draw_ui(&mut self) -> Result<(), AppError> {
         let status = self.gui_state.lock().get_status();
-        if status.contains(&Status::DockerConnect) {
-            self.err_loop()?;
+        if let Some(Status::DockerConnect(msg)) = status
+            .iter()
+            .find(|s| matches!(s, Status::DockerConnect(_)))
+        {
+            self.err_loop(msg.clone())?;
         } else {
             self.gui_loop().await?;
         }
@@ -463,6 +467,6 @@ fn draw_frame(
     }
 
     if let Some(error) = fd.has_error.as_ref() {
-        draw_blocks::error::draw(colors, error, f, keymap, None);
+        draw_blocks::error::draw(colors, error, f, None, keymap, None);
     }
 }
