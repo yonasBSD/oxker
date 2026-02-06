@@ -9,7 +9,7 @@ use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 use crate::{
-    app_data::{AppData, ContainerId, Header},
+    app_data::{AppData, ContainerId, Header, ScrollDirection},
     exec::ExecMode,
 };
 
@@ -169,8 +169,15 @@ pub enum Status {
     Filter,
     Help,
     Init,
+    Inspect,
     Logs,
     SearchLogs,
+}
+
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct ScrollOffset {
+    pub x: usize,
+    pub y: usize,
 }
 
 /// Global gui_state, stored in an Arc<Mutex>
@@ -190,6 +197,8 @@ pub struct GuiState {
     selected_panel: SelectablePanel,
     screen_width: u16,
     show_logs: bool,
+    inspect_offset: ScrollOffset,
+    inspect_offset_max: ScrollOffset,
     status: HashSet<Status>,
     pub info_box_text: Option<(String, Instant)>,
 }
@@ -203,6 +212,8 @@ impl GuiState {
             intersect_heading: HashMap::new(),
             intersect_help: None,
             intersect_panel: HashMap::new(),
+            inspect_offset: ScrollOffset::default(),
+            inspect_offset_max: ScrollOffset::default(),
             loading_handle: None,
             loading_index: 0,
             loading_set: HashSet::new(),
@@ -233,6 +244,50 @@ impl GuiState {
             }
             self.rerender.update_draw();
         }
+    }
+
+    pub fn set_inspect_offset(&mut self, sd: &ScrollDirection) {
+        match sd {
+            ScrollDirection::Up => self.inspect_offset.y = self.inspect_offset.y.saturating_sub(1),
+            ScrollDirection::Down => {
+                self.inspect_offset.y = self
+                    .inspect_offset
+                    .y
+                    .saturating_add(1)
+                    .min(self.inspect_offset_max.y)
+            }
+            ScrollDirection::Left => {
+                self.inspect_offset.x = self.inspect_offset.x.saturating_sub(1)
+            }
+            ScrollDirection::Right => {
+                self.inspect_offset.x = self
+                    .inspect_offset
+                    .x
+                    .saturating_add(1)
+                    .min(self.inspect_offset_max.x)
+            }
+        }
+        self.rerender.update_draw();
+    }
+
+    pub fn get_inspect_offset(&self) -> ScrollOffset {
+        self.inspect_offset
+    }
+
+    pub fn set_inspect_offset_max(&mut self, offset: ScrollOffset) {
+        self.inspect_offset_max = offset
+    }
+
+    pub fn set_inspect_offset_y_to_max(&mut self) {
+        self.inspect_offset.y = self.inspect_offset_max.y;
+        self.rerender.update_draw();
+    }
+
+    pub fn clear_inspect_offset(&mut self) {
+        self.inspect_offset.x = 0;
+        self.inspect_offset.y = 0;
+        self.inspect_offset_max = ScrollOffset::default();
+        self.rerender.update_draw();
     }
 
     /// Set the screen width, used for offset char calculations

@@ -1,4 +1,4 @@
-use bollard::models::ContainerSummary;
+use bollard::{models::ContainerSummary, secret::ContainerInspectResponse};
 use core::fmt;
 use parking_lot::Mutex;
 use ratatui::{layout::Size, text::Text, widgets::ListState};
@@ -114,6 +114,45 @@ impl Filter {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct InspectData {
+    pub width: usize,
+    pub height: usize,
+    pub as_string: String,
+    pub name: String,
+    pub id: ContainerId, // pub as_lines: Vec<Line<'a>>,
+}
+
+impl From<ContainerInspectResponse> for InspectData {
+    fn from(input: ContainerInspectResponse) -> Self {
+        let as_string = serde_json::to_string_pretty(&input)
+            .unwrap_or_default()
+            .lines()
+            .skip(1)
+            .collect::<Vec<_>>()
+            .split_last()
+            .map(|(_, data)| data)
+            .unwrap_or_default()
+            .join("\n");
+
+        let height = as_string.lines().count();
+
+        let mut width = 0;
+        for i in as_string.lines() {
+            width = width.max(i.chars().count());
+        }
+
+        Self {
+            name: input.name.unwrap_or_default(),
+            // TODO maybe make this an Option<Id>?
+            id: ContainerId::from(input.id.unwrap_or_default().as_str()),
+            width,
+            height,
+            as_string,
+        }
+    }
+}
+
 /// Global app_state, stored in an Arc<Mutex>
 #[derive(Debug, Clone)]
 #[cfg(not(test))]
@@ -122,6 +161,7 @@ pub struct AppData {
     error: Option<AppError>,
     filter: Filter,
     hidden_containers: Vec<ContainerItem>,
+    inspect_data: Option<InspectData>,
     rerender: Arc<Rerender>,
     sorted_by: Option<(Header, SortedOrder)>,
     current_sorted_id: Vec<ContainerId>,
@@ -136,6 +176,7 @@ pub struct AppData {
     pub error: Option<AppError>,
     pub filter: Filter,
     pub hidden_containers: Vec<ContainerItem>,
+    pub inspect_data: Option<InspectData>,
     pub current_sorted_id: Vec<ContainerId>,
     pub rerender: Arc<Rerender>,
     pub sorted_by: Option<(Header, SortedOrder)>,
@@ -151,6 +192,7 @@ impl AppData {
             error: None,
             filter: Filter::new(),
             hidden_containers: vec![],
+            inspect_data: None,
             rerender: Arc::clone(redraw),
             sorted_by: None,
         }
@@ -165,6 +207,18 @@ impl AppData {
             .as_secs()
     }
 
+    pub fn clear_inspect_data(&mut self) {
+        self.inspect_data = None;
+    }
+
+    pub fn set_inspect_data(&mut self, data: ContainerInspectResponse) {
+        self.inspect_data = Some(InspectData::from(data))
+        // self.inspect_data = Some(data)
+    }
+
+    pub fn get_inspect_data(&self) -> Option<InspectData> {
+        self.inspect_data.clone()
+    }
     /// Filter related methods
     /// Get the filterby and filter_term
     pub const fn get_filter(&self) -> (FilterBy, Option<&String>) {
@@ -329,6 +383,7 @@ impl AppData {
                 .iter()
                 .position(|i| self.get_selected_container_id().as_ref() == Some(&i.id)),
         );
+        self.rerender.update_draw();
     }
 
     /// Remove the sorted header & order, and sort by default - created datetime
@@ -667,19 +722,22 @@ impl AppData {
     }
 
     pub fn logs_horizontal_scroll(&mut self, sd: &ScrollDirection, width: u16) {
+        // Change this to set a max_offset, instead of taking in width each time, then can be combined with the log_scroll beneath
         match sd {
-            ScrollDirection::Next => {
+            ScrollDirection::Down => {
                 if let Some(i) = self.get_mut_selected_container() {
                     i.logs.forward(width);
                     self.rerender.update_draw();
                 }
             }
-            ScrollDirection::Previous => {
+            ScrollDirection::Up => {
                 if let Some(i) = self.get_mut_selected_container() {
                     i.logs.back();
                     self.rerender.update_draw();
                 }
             }
+            // TODO set offset
+            _ => (),
         }
     }
 
@@ -687,8 +745,10 @@ impl AppData {
     pub fn log_scroll(&mut self, scroll: &ScrollDirection) {
         if let Some(i) = self.get_mut_selected_container() {
             match scroll {
-                ScrollDirection::Next => i.logs.next(),
-                ScrollDirection::Previous => i.logs.previous(),
+                ScrollDirection::Down => i.logs.next(),
+                ScrollDirection::Up => i.logs.previous(),
+                // TODO set offset
+                _ => (),
             }
             self.rerender.update_draw();
         }
@@ -876,7 +936,7 @@ impl AppData {
                 // If removed container is currently selected, then change selected to previous
                 // This will default to 0 in any edge cases
                 if self.containers.state.selected().is_some() {
-                    self.containers.scroll(&ScrollDirection::Previous);
+                    self.containers.scroll(&ScrollDirection::Up);
                 }
                 // Check is some, else can cause out of bounds error, if containers get removed before a docker update
                 if self.containers.items.get(index).is_some() {
@@ -1443,7 +1503,7 @@ mod tests {
         );
 
         // Calling previous when at start has no effect
-        app_data.containers_scroll(&ScrollDirection::Previous);
+        app_data.containers_scroll(&ScrollDirection::Up);
         let result = app_data.get_selected_container_id();
         assert_eq!(result, Some(ContainerId::from("1")));
         let result = app_data.get_selected_container_id_state_name();
@@ -1466,7 +1526,7 @@ mod tests {
 
         // Advance list state by 1
         app_data.containers_start();
-        app_data.containers.scroll(&ScrollDirection::Next);
+        app_data.containers.scroll(&ScrollDirection::Down);
 
         let result = app_data.get_container_state();
         assert_eq!(result.selected(), Some(1));
@@ -1510,7 +1570,7 @@ mod tests {
         );
 
         // Calling previous when at end has no effect
-        app_data.containers.scroll(&ScrollDirection::Next);
+        app_data.containers.scroll(&ScrollDirection::Down);
         let result = app_data.get_selected_container_id();
         assert_eq!(result, Some(ContainerId::from("3")));
         let result = app_data.get_selected_container_id_state_name();
@@ -1531,7 +1591,7 @@ mod tests {
         let mut app_data = gen_appdata(&containers);
 
         app_data.containers_end();
-        app_data.containers.scroll(&ScrollDirection::Previous);
+        app_data.containers.scroll(&ScrollDirection::Up);
         let result = app_data.get_container_state();
         assert_eq!(result.selected(), Some(1));
         assert_eq!(result.offset(), 0);
@@ -1547,7 +1607,7 @@ mod tests {
         assert_eq!(result, None);
 
         app_data.containers.start();
-        app_data.containers.scroll(&ScrollDirection::Next);
+        app_data.containers.scroll(&ScrollDirection::Down);
 
         let result = app_data.get_selected_container();
         assert_eq!(result, Some(&containers[1]));
@@ -1634,7 +1694,7 @@ mod tests {
         let mut app_data = gen_appdata(&containers);
         app_data.containers_start();
         app_data.docker_controls_start();
-        app_data.docker_controls_scroll(&ScrollDirection::Next);
+        app_data.docker_controls_scroll(&ScrollDirection::Down);
 
         let result = app_data.selected_docker_controls();
         assert_eq!(result, Some(DockerCommand::Restart));
@@ -1652,7 +1712,7 @@ mod tests {
         assert_eq!(result, Some(DockerCommand::Delete));
 
         // Next has no effect when at end
-        app_data.docker_controls_scroll(&ScrollDirection::Next);
+        app_data.docker_controls_scroll(&ScrollDirection::Down);
         let result = app_data.selected_docker_controls();
         assert_eq!(result, Some(DockerCommand::Delete));
     }
@@ -1664,14 +1724,14 @@ mod tests {
         let mut app_data = gen_appdata(&containers);
         app_data.containers_start();
         app_data.docker_controls_end();
-        app_data.docker_controls_scroll(&ScrollDirection::Previous);
+        app_data.docker_controls_scroll(&ScrollDirection::Up);
 
         let result = app_data.selected_docker_controls();
         assert_eq!(result, Some(DockerCommand::Stop));
 
         // previous has no effect when at start
         app_data.docker_controls_start();
-        app_data.docker_controls_scroll(&ScrollDirection::Previous);
+        app_data.docker_controls_scroll(&ScrollDirection::Up);
         let result = app_data.selected_docker_controls();
         assert_eq!(result, Some(DockerCommand::Pause));
     }
@@ -1935,7 +1995,7 @@ mod tests {
         assert_eq!(result, " 3/3 - container_1 - image_1");
 
         // Change log state to no longer be at the end
-        app_data.log_scroll(&ScrollDirection::Previous);
+        app_data.log_scroll(&ScrollDirection::Up);
         let result = app_data.get_log_title();
         assert_eq!(result, " 2/3 - container_1 - image_1");
     }
@@ -1956,7 +2016,7 @@ mod tests {
         assert_eq!(result, " - container_1 - image_1");
 
         // change container
-        app_data.containers_scroll(&ScrollDirection::Next);
+        app_data.containers_scroll(&ScrollDirection::Down);
         let result = app_data.get_log_title();
         assert_eq!(result, " - container_2 - image_2");
 
@@ -1967,7 +2027,7 @@ mod tests {
         assert_eq!(result, " 3/3 - container_2 - image_2");
 
         // Change log state to no longer be at the end
-        app_data.log_scroll(&ScrollDirection::Previous);
+        app_data.log_scroll(&ScrollDirection::Up);
         let result = app_data.get_log_title();
         assert_eq!(result, " 2/3 - container_2 - image_2");
     }
@@ -2074,7 +2134,7 @@ mod tests {
         let result = app_data.get_log_title();
         assert_eq!(result, " 1/3 - container_1 - image_1");
 
-        app_data.log_scroll(&ScrollDirection::Next);
+        app_data.log_scroll(&ScrollDirection::Down);
         let result = app_data.get_log_state();
         assert!(result.is_some());
         assert_eq!(result.as_ref().unwrap().selected(), Some(1));
@@ -2083,7 +2143,7 @@ mod tests {
         let result = app_data.get_log_title();
         assert_eq!(result, " 2/3 - container_1 - image_1");
 
-        app_data.log_scroll(&ScrollDirection::Next);
+        app_data.log_scroll(&ScrollDirection::Down);
         let result = app_data.get_log_state();
         assert!(result.is_some());
         assert_eq!(result.as_ref().unwrap().selected(), Some(2));
@@ -2091,7 +2151,7 @@ mod tests {
 
         let result = app_data.get_log_title();
         assert_eq!(result, " 3/3 - container_1 - image_1");
-        app_data.log_scroll(&ScrollDirection::Next);
+        app_data.log_scroll(&ScrollDirection::Down);
 
         let result = app_data.get_log_state();
         assert!(result.is_some());
@@ -2122,7 +2182,7 @@ mod tests {
         let result = app_data.get_log_title();
         assert_eq!(result, " 3/3 - container_1 - image_1");
 
-        app_data.log_scroll(&ScrollDirection::Previous);
+        app_data.log_scroll(&ScrollDirection::Up);
 
         let result = app_data.get_log_state();
         assert!(result.is_some());
@@ -2131,7 +2191,7 @@ mod tests {
         let result = app_data.get_log_title();
         assert_eq!(result, " 2/3 - container_1 - image_1");
 
-        app_data.log_scroll(&ScrollDirection::Previous);
+        app_data.log_scroll(&ScrollDirection::Up);
         let result = app_data.get_log_state();
         assert!(result.is_some());
         assert_eq!(result.as_ref().unwrap().selected(), Some(0));
@@ -2139,7 +2199,7 @@ mod tests {
         let result = app_data.get_log_title();
         assert_eq!(result, " 1/3 - container_1 - image_1");
 
-        app_data.log_scroll(&ScrollDirection::Previous);
+        app_data.log_scroll(&ScrollDirection::Up);
         let result = app_data.get_log_state();
         assert!(result.is_some());
         assert_eq!(result.as_ref().unwrap().selected(), Some(0));
@@ -2433,7 +2493,7 @@ mod tests {
         }
 
         for _ in 0..=500 {
-            app_data.log_scroll(&ScrollDirection::Next);
+            app_data.log_scroll(&ScrollDirection::Down);
         }
         let result = app_data.get_logs(
             Size {

@@ -20,26 +20,30 @@ pub mod filter;
 pub mod headers;
 pub mod help;
 pub mod info;
+pub mod inspect;
 pub mod logs;
 pub mod popup;
 pub mod ports;
 pub mod search_logs;
 
-pub const NAME_TEXT: &str = r#"
-                          88                               
-                          88                               
-                          88                               
- ,adPPYba,   8b,     ,d8  88   ,d8    ,adPPYba,  8b,dPPYba,
-a8"     "8a   `Y8, ,8P'   88 ,a8"    a8P_____88  88P'   "Y8
-8b       d8     )888(     8888[      8PP"""""""  88        
-"8a,   ,a8"   ,d8" "8b,   88`"Yba,   "8b,   ,aa  88        
- `"YbbdP"'   8P'     `Y8  88   `Y8a   `"Ybbd8"'  88        "#;
+pub const NAME_TEXT: &str = r#"                         88                              
+                         88                              
+ ,adPPYba,  8b,     ,d8  88   ,d8   ,adPPYba,  8b,dPPYba,
+a8"     "8a  `Y8, ,8P'   88 ,a8"   a8P_____88  88P'   "Y8
+8b       d8    )888(     8888(     8PP"""""""  88        
+"8a,   ,a8"  ,d8" "8b,   88`"Yba,  "8b,   ,aa  88        
+ `"YbbdP"'  8P'     `Y8  88   `Y8a  `"Ybbd8"'  88        "#;
 
 pub const NAME: &str = env!("CARGO_PKG_NAME");
 pub const REPO: &str = env!("CARGO_PKG_REPOSITORY");
 pub const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 pub const MARGIN: &str = "   ";
-pub const RIGHT_ARROW: &str = "▶ ";
+pub const SELECT_ARROW: &str = "▶ ";
+// TODO use me all over the place
+pub const LEFT_ARROW: &str = "←";
+pub const RIGHT_ARROW: &str = "→";
+pub const DOWN_ARROW: &str = "↓";
+pub const UP_ARROW: &str = "↑";
 pub const CIRCLE: &str = "⚪ ";
 
 #[cfg(not(test))]

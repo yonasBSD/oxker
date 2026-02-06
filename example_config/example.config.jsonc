@@ -104,10 +104,10 @@
 			"k"
 		],
 		// Horizontal scroll of the logs
-		"log_scroll_forward": [
+		"scroll_forward": [
 			"right"
 		],
-		"log_scroll_back": [
+		"scroll_back": [
 			"left"
 		],
 		// Select next panel
@@ -169,6 +169,10 @@
 		// Toggle visibility of the log section
 		"log_section_toggle": [
 			"\\"
+		],
+		// Toggle to inspect container screen
+		"inspect":  [
+			"i"
 		],
 		// Force a complete clear & redraw of the screen
 		"force_redraw": [

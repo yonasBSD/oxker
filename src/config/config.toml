@@ -95,8 +95,8 @@ scroll_start = ["home"]
 # scroll up a list by one item
 scroll_up = ["up", "k"]
 # Horizontal scroll of the logs
-log_scroll_forward = ["right"]
-log_scroll_back = ["left"]
+scroll_forward = ["right"]
+scroll_back = ["left"]
 # Select next panel
 select_next_panel = ["tab"]
 # Select previous panel
@@ -122,8 +122,8 @@ log_section_height_decrease = ["-"]
 log_section_height_increase = ["+"]
 # Toggle visibility of the log section
 log_section_toggle = ["\\"]
-
-
+# Toggle to inspect container screen
+inspect = ["i"]
 
 # Force a complete clear & redraw of the screen
 force_redraw = ["f"]

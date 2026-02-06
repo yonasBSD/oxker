@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::RIGHT_ARROW;
+use super::SELECT_ARROW;
 use crate::{
     app_data::AppData,
     config::AppColors,
@@ -44,7 +44,7 @@ pub fn draw(
         let items = List::new(items)
             .block(block)
             .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-            .highlight_symbol(RIGHT_ARROW);
+            .highlight_symbol(SELECT_ARROW);
         f.render_stateful_widget(items, area, i);
     } else {
         let paragraph = Paragraph::new("").block(block).alignment(Alignment::Center);
@@ -173,7 +173,7 @@ mod tests {
         setup
             .app_data
             .lock()
-            .docker_controls_scroll(&ScrollDirection::Next);
+            .docker_controls_scroll(&ScrollDirection::Down);
 
         setup
             .terminal
@@ -370,7 +370,7 @@ mod tests {
         setup
             .app_data
             .lock()
-            .docker_controls_scroll(&ScrollDirection::Next);
+            .docker_controls_scroll(&ScrollDirection::Down);
 
         setup
             .terminal

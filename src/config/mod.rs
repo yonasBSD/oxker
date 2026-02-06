@@ -25,7 +25,8 @@ pub struct Config {
     pub keymap: Keymap,
     pub log_search_case_sensitive: bool,
     pub raw_logs: bool,
-    pub save_dir: Option<PathBuf>,
+    pub dir_config: Option<PathBuf>,
+    pub dir_save: Option<PathBuf>,
     pub show_logs: bool,
     pub show_self: bool,
     pub show_std_err: bool,
@@ -47,7 +48,8 @@ impl From<&Args> for Config {
             keymap: Keymap::new(),
             log_search_case_sensitive: true,
             raw_logs: args.raw,
-            save_dir: Self::try_get_logs_dir(args.save_dir.as_ref()),
+            dir_save: Self::try_get_logs_dir(args.save_dir.as_ref()),
+            dir_config: args.config_file.as_ref().map(|i| PathBuf::from(&i)),
             show_logs: true,
             show_self: !args.show_self,
             show_std_err: !args.no_std_err,
@@ -59,19 +61,20 @@ impl From<&Args> for Config {
     }
 }
 
-impl From<ConfigFile> for Config {
-    fn from(config_file: ConfigFile) -> Self {
+impl From<(ConfigFile, Option<PathBuf>)> for Config {
+    fn from((config_file, dir): (ConfigFile, Option<PathBuf>)) -> Self {
         Self {
             app_colors: AppColors::from(config_file.colors),
             color_logs: config_file.color_logs.unwrap_or(false),
             docker_interval_ms: config_file.docker_interval.unwrap_or(1000),
+            dir_config: dir,
             gui: config_file.gui.unwrap_or(true),
             host: config_file.host,
             in_container: Self::check_if_in_container(),
             keymap: Keymap::from(config_file.keymap),
             log_search_case_sensitive: config_file.log_search_case_sensitive.unwrap_or(true),
             raw_logs: config_file.raw_logs.unwrap_or(false),
-            save_dir: Self::try_get_logs_dir(config_file.save_dir.as_ref()),
+            dir_save: Self::try_get_logs_dir(config_file.save_dir.as_ref()),
             show_logs: config_file.show_logs.unwrap_or(true),
             show_self: config_file.show_self.unwrap_or(false),
             show_std_err: config_file.show_std_err.unwrap_or(true),
@@ -182,8 +185,8 @@ impl Config {
             self.host = Some(host);
         }
 
-        if let Some(x) = config_from_cli.save_dir {
-            self.save_dir = Some(x);
+        if let Some(x) = config_from_cli.dir_save {
+            self.dir_save = Some(x);
         }
 
         if let Some(tz) = config_from_cli.timezone {
@@ -208,15 +211,16 @@ impl Config {
         let args = Args::parse();
         let config_from_cli = Self::from(&args);
 
-        if let Some(config_file) = &args.config_file
+        if let Some(dir_config_file) = &args.config_file
             && let Some(config_file) =
-                parse_config_file::ConfigFile::try_parse_from_file(config_file)
+                parse_config_file::ConfigFile::try_parse_from_file(dir_config_file)
         {
-            return Self::from(config_file).merge_args(config_from_cli);
+            return Self::from((config_file, Some(PathBuf::from(dir_config_file))))
+                .merge_args(config_from_cli);
         }
 
-        if let Some(config_file) = parse_config_file::ConfigFile::try_parse(in_container) {
-            return Self::from(config_file).merge_args(config_from_cli);
+        if let Some((config_file, dir)) = parse_config_file::ConfigFile::try_parse(in_container) {
+            return Self::from((config_file, Some(dir))).merge_args(config_from_cli);
         }
         config_from_cli
     }
