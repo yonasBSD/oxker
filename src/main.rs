@@ -42,15 +42,17 @@ fn setup_tracing() {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 }
 
-/// Read the optional docker_host path,  the DOCKER_HOST env take priority over cli or config
+/// Read the optional docker_host path
 /// Bollard will use DOCKER_HOST env, so might be pointless here, although it will fix it's priority over any config setting
 fn read_docker_host(config: &Config) -> Option<String> {
-    if let Ok(env) = std::env::var(DOCKER_HOST)
+    if let Some(x) = &config.host {
+        Some(x.to_string())
+    } else if let Ok(env) = std::env::var(DOCKER_HOST)
         && !env.trim().is_empty()
     {
         Some(env)
     } else {
-        config.host.as_ref().cloned()
+        None
     }
 }
 
@@ -174,23 +176,24 @@ mod tests {
     /// Default test config, has timestamps turned off
     pub fn gen_config() -> Config {
         Config {
+            app_colors: AppColors::new(),
             color_logs: false,
+            dir_save: None,
+            dir_config: None,
             docker_interval_ms: 1000,
             gui: true,
             host: None,
-            show_std_err: false,
             in_container: false,
-            save_dir: None,
+            keymap: Keymap::new(),
             log_search_case_sensitive: true,
             raw_logs: false,
-            show_self: false,
-            app_colors: AppColors::new(),
-            keymap: Keymap::new(),
-            timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
-            show_timestamp: false,
-            use_cli: false,
             show_logs: true,
+            show_self: false,
+            show_std_err: false,
+            show_timestamp: false,
+            timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
             timezone: None,
+            use_cli: false,
         }
     }
 
@@ -216,6 +219,7 @@ mod tests {
             containers: StatefulList::new(containers.to_vec()),
             hidden_containers: vec![],
             current_sorted_id: vec![],
+            inspect_data: None,
             error: None,
             sorted_by: None,
             rerender: Arc::new(Rerender::new()),
