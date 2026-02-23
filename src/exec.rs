@@ -1,5 +1,5 @@
 use std::{
-    io::{Read, Stdout, Write},
+    io::{Read, Write},
     sync::{Arc, atomic::AtomicBool, mpsc::Sender},
 };
 
@@ -10,7 +10,7 @@ use bollard::{
 use crossterm::terminal::enable_raw_mode;
 use futures_util::StreamExt;
 use parking_lot::Mutex;
-use ratatui::{Terminal, backend::CrosstermBackend};
+use ratatui::layout::Size;
 use tokio::{
     fs::File,
     io::{AsyncReadExt, AsyncWriteExt},
@@ -123,23 +123,29 @@ impl AsyncTTY {
     }
 }
 
-/// This is used to set the terminal size when exec via the Internal method
-#[derive(Debug, Clone)]
-pub struct TerminalSize {
-    width: u16,
-    height: u16,
-}
+// impl TryFrom<&Terminal<CrosstermBackend<Stdout>>> for HWU16 {
+// 	type Error = None;
+// 		  fn try_from(terminal: &Terminal<CrosstermBackend<Stdout>>) -> Option<Self> {
+//         terminal.size().map_or(None, |i| {
+//             Some(Self {
+//                 width: i.width,
+//                 height: i.height,
+//             })
+//         })
+// 	}
 
-impl TerminalSize {
-    pub fn new(terminal: &Terminal<CrosstermBackend<Stdout>>) -> Option<Self> {
-        terminal.size().map_or(None, |i| {
-            Some(Self {
-                width: i.width,
-                height: i.height,
-            })
-        })
-    }
-}
+// }
+
+// impl TerminalSize {
+//     pub fn new(terminal: &Terminal<CrosstermBackend<Stdout>>) -> Option<Self> {
+//         terminal.size().map_or(None, |i| {
+//             Some(Self {
+//                 width: i.width,
+//                 height: i.height,
+//             })
+//         })
+//     }
+// }
 
 #[derive(Debug, Clone)]
 pub enum ExecMode {
@@ -161,51 +167,41 @@ impl ExecMode {
         let use_cli = app_data.lock().config.use_cli;
         let container = app_data.lock().get_selected_container_id_state_name();
 
-        if let Some((id, state, _)) = container {
-            if [
+        if let Some((id, state, _)) = container
+            && [
                 State::Running(RunningState::Healthy),
                 State::Running(RunningState::Unhealthy),
             ]
             .contains(&state)
+        {
+            if tty_readable()
+                && !use_cli
+                && let Ok(exec) = docker
+                    .create_exec(
+                        id.get(),
+                        CreateExecOptions {
+                            attach_stdout: Some(true),
+                            attach_stderr: Some(true),
+                            cmd: Some(vec![command::PWD]),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                && let Ok(StartExecResults::Attached { mut output, .. }) =
+                    docker.start_exec(&exec.id, None).await
+                && let Some(Ok(msg)) = output.next().await
+                && !msg.to_string().starts_with(OCI_ERROR)
             {
-                if tty_readable() && !use_cli {
-                    if let Ok(exec) = docker
-                        .create_exec(
-                            id.get(),
-                            CreateExecOptions {
-                                attach_stdout: Some(true),
-                                attach_stderr: Some(true),
-                                cmd: Some(vec![command::PWD]),
-                                ..Default::default()
-                            },
-                        )
-                        .await
-                    {
-                        if let Ok(StartExecResults::Attached { mut output, .. }) =
-                            docker.start_exec(&exec.id, None).await
-                        {
-                            if let Some(Ok(msg)) = output.next().await {
-                                if !msg.to_string().starts_with(OCI_ERROR) {
-                                    return Some(Self::Internal((
-                                        Arc::new(id),
-                                        Arc::clone(docker),
-                                    )));
-                                }
-                            }
-                        }
-                    }
-                }
+                return Some(Self::Internal((Arc::new(id), Arc::clone(docker))));
+            }
 
-                if let Ok(output) = std::process::Command::new(command::DOCKER)
-                    .args([command::EXEC, id.get(), command::PWD])
-                    .output()
-                {
-                    if let Ok(output) = String::from_utf8(output.stdout) {
-                        if !output.starts_with(OCI_ERROR) {
-                            return Some(Self::External(Arc::new(id)));
-                        }
-                    }
-                }
+            if let Ok(output) = std::process::Command::new(command::DOCKER)
+                .args([command::EXEC, id.get(), command::PWD])
+                .output()
+                && let Ok(output) = String::from_utf8(output.stdout)
+                && !output.starts_with(OCI_ERROR)
+            {
+                return Some(Self::External(Arc::new(id)));
             }
         }
         None
@@ -235,7 +231,7 @@ impl ExecMode {
         &self,
         id: &ContainerId,
         docker: &Arc<Docker>,
-        terminal_size: Option<TerminalSize>,
+        terminal_size: Option<Size>,
     ) -> Result<(), AppError> {
         let cancel_token = CancellationToken::new();
 
@@ -351,7 +347,7 @@ impl ExecMode {
         }
     }
 
-    pub async fn run(&self, tty_size: Option<TerminalSize>) -> Result<(), AppError> {
+    pub async fn run(&self, tty_size: Option<Size>) -> Result<(), AppError> {
         match self {
             Self::External(id) => {
                 Self::exec_external(id);

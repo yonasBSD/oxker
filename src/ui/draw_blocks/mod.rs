@@ -11,7 +11,8 @@ use crate::config::AppColors;
 
 use super::{FrameData, GuiState, SelectablePanel, Status, gui_state::Region};
 
-pub mod charts;
+pub mod chart_bandwidth;
+pub mod chart_cpu_mem;
 pub mod commands;
 pub mod containers;
 pub mod delete_confirm;
@@ -20,26 +21,29 @@ pub mod filter;
 pub mod headers;
 pub mod help;
 pub mod info;
+pub mod inspect;
 pub mod logs;
 pub mod popup;
 pub mod ports;
 pub mod search_logs;
 
-pub const NAME_TEXT: &str = r#"
-                          88                               
-                          88                               
-                          88                               
- ,adPPYba,   8b,     ,d8  88   ,d8    ,adPPYba,  8b,dPPYba,
-a8"     "8a   `Y8, ,8P'   88 ,a8"    a8P_____88  88P'   "Y8
-8b       d8     )888(     8888[      8PP"""""""  88        
-"8a,   ,a8"   ,d8" "8b,   88`"Yba,   "8b,   ,aa  88        
- `"YbbdP"'   8P'     `Y8  88   `Y8a   `"Ybbd8"'  88        "#;
+pub const NAME_TEXT: &str = r#"                         88                              
+                         88                              
+ ,adPPYba,  8b,     ,d8  88   ,d8   ,adPPYba,  8b,dPPYba,
+a8"     "8a  `Y8, ,8P'   88 ,a8"   a8P_____88  88P'   "Y8
+8b       d8    )888(     8888(     8PP"""""""  88        
+"8a,   ,a8"  ,d8" "8b,   88`"Yba,  "8b,   ,aa  88        
+ `"YbbdP"'  8P'     `Y8  88   `Y8a  `"Ybbd8"'  88        "#;
 
 pub const NAME: &str = env!("CARGO_PKG_NAME");
 pub const REPO: &str = env!("CARGO_PKG_REPOSITORY");
 pub const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 pub const MARGIN: &str = "   ";
-pub const RIGHT_ARROW: &str = "▶ ";
+pub const SELECT_ARROW: &str = "▶ ";
+pub const LEFT_ARROW: &str = "←";
+pub const RIGHT_ARROW: &str = "→";
+pub const DOWN_ARROW: &str = "↓";
+pub const UP_ARROW: &str = "↑";
 pub const CIRCLE: &str = "⚪ ";
 
 #[cfg(not(test))]
@@ -103,12 +107,12 @@ fn generate_block<'a>(
         .border_type(BorderType::Rounded)
         .title(ratatui::text::Line::from(title).left_aligned());
 
-    if panel == SelectablePanel::Logs {
-        if let Some(x) = fd.scroll_title.as_ref() {
-            block = block
-                .title_bottom(x.to_owned())
-                .title_alignment(ratatui::layout::Alignment::Right);
-        }
+    if panel == SelectablePanel::Logs
+        && let Some(x) = fd.scroll_title.as_ref()
+    {
+        block = block
+            .title_bottom(x.to_owned())
+            .title_alignment(ratatui::layout::Alignment::Right);
     }
     if !fd.status.contains(&Status::Filter) {
         if fd.selected_panel == panel {
@@ -242,7 +246,7 @@ pub mod tests {
 
     #[allow(clippy::cast_precision_loss)]
     // Add fixed data to the cpu & mem vecdeques
-    pub fn insert_chart_data(setup: &TuiTestSetup) {
+    pub fn insert_all_chart_data(setup: &TuiTestSetup) {
         for i in 1..=10 {
             setup.app_data.lock().update_stats_by_id(
                 &setup.ids[0],
@@ -273,7 +277,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout() {
         let mut setup = test_setup(160, 30, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -301,7 +305,7 @@ pub mod tests {
     /// Check that the whole layout is drawn correctly
     fn test_draw_blocks_whole_layout_with_filter_bar() {
         let mut setup = test_setup(160, 30, true, true);
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
 
         setup.app_data.lock().containers.items[1]
@@ -337,7 +341,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_long_name() {
         let mut setup = test_setup(190, 30, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -370,7 +374,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_no_logs() {
         let mut setup = test_setup(160, 30, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -399,7 +403,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_short_height_logs() {
         let mut setup = test_setup(160, 30, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -431,7 +435,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_help_panel() {
         let mut setup = test_setup(160, 40, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -461,7 +465,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_error() {
         let mut setup = test_setup(160, 40, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -495,7 +499,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_delete() {
         let mut setup = test_setup(160, 40, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -527,7 +531,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_info_box() {
         let mut setup = test_setup(160, 40, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports

@@ -11,7 +11,7 @@ use ratatui::{
 
 use super::{CONSTRAINT_50_50, FrameData};
 use crate::{
-    app_data::{ByteStats, CpuStats, State, Stats},
+    app_data::{State, Stats},
     config::AppColors,
 };
 
@@ -118,7 +118,7 @@ fn make_chart<'a, T: Stats + Display>(
 
 /// Draw the cpu + mem charts
 pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameData) {
-    if let Some((cpu, mem)) = fd.chart_data.as_ref() {
+    if let Some(x) = fd.chart_data.as_ref() {
         let area = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(CONSTRAINT_50_50)
@@ -129,34 +129,34 @@ pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameData) {
                 .marker(symbols::Marker::Dot)
                 .style(Style::default().fg(colors.chart_cpu.points))
                 .graph_type(GraphType::Line)
-                .data(&cpu.0),
+                .data(&x.cpu.dataset),
         ];
         let mem_dataset = vec![
             Dataset::default()
                 .marker(symbols::Marker::Dot)
                 .style(Style::default().fg(colors.chart_memory.points))
                 .graph_type(GraphType::Line)
-                .data(&mem.0),
+                .data(&x.memory.dataset),
         ];
 
-        let cpu_stats = CpuStats::new(cpu.0.last().map_or(0.00, |f| f.1));
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let mem_stats = ByteStats::new(mem.0.last().map_or(0, |f| f.1 as u64));
+        // let cpu_stats = CpuStats::new(cpu.0.last().map_or(0.00, |f| f.1));
+        // #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        // let mem_stats = ByteStats::new(mem.0.last().map_or(0, |f| f.1 as u64));
         let cpu_chart = make_chart(
             ChartVariant::Cpu,
             colors,
-            &cpu_stats,
+            &x.cpu.current,
             cpu_dataset,
-            &cpu.1,
-            cpu.2,
+            &x.cpu.max,
+            x.state,
         );
         let mem_chart = make_chart(
             ChartVariant::Memory,
             colors,
-            &mem_stats,
+            &x.memory.current,
             mem_dataset,
-            &mem.1,
-            mem.2,
+            &x.memory.max,
+            x.state,
         );
 
         f.render_widget(cpu_chart, area[0]);
@@ -175,7 +175,7 @@ mod tests {
         config::AppColors,
         ui::{
             FrameData,
-            draw_blocks::tests::{COLOR_ORANGE, get_result, insert_chart_data, test_setup},
+            draw_blocks::tests::{COLOR_ORANGE, get_result, insert_all_chart_data, test_setup},
         },
     };
 
@@ -194,42 +194,41 @@ mod tests {
     ];
 
     // co-ordinates of the dots from the cpu chart
-    const CPU_XY: [(usize, usize); 15] = [
-        (1, 12),
-        (2, 11),
+    const CPU_XY: [(usize, usize); 16] = [
+        (1, 13),
         (2, 12),
-        (3, 10),
+        (2, 13),
         (3, 11),
-        (3, 12),
-        (4, 10),
-        (4, 12),
-        (5, 9),
+        (3, 13),
+        (4, 11),
+        (4, 13),
+        (5, 10),
         (5, 13),
-        (5, 14),
-        (6, 8),
+        (6, 9),
         (6, 13),
+        (6, 14),
         (7, 8),
+        (7, 9),
         (7, 13),
+        (7, 14),
     ];
 
     // co-ordinates of the dots from the memory chart
-    const MEM_XY: [(usize, usize); 16] = [
-        (1, 54),
+    const MEM_XY: [(usize, usize); 14] = [
         (1, 55),
         (2, 54),
         (2, 55),
-        (3, 53),
+        (3, 54),
         (3, 55),
-        (4, 52),
+        (4, 53),
         (4, 55),
-        (5, 51),
         (5, 52),
-        (5, 55),
+        (5, 53),
         (5, 56),
-        (6, 51),
-        (6, 55),
+        (6, 52),
+        (6, 56),
         (7, 51),
-        (7, 55),
+        (7, 56),
     ];
 
     #[test]
@@ -275,7 +274,7 @@ mod tests {
     fn test_draw_blocks_charts_running_some() {
         let mut setup = test_setup(80, 10, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         let fd = FrameData::from((&setup.app_data, &setup.gui_state));
 
         setup
@@ -324,7 +323,7 @@ mod tests {
     fn test_draw_blocks_charts_paused() {
         let mut setup = test_setup(80, 10, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         setup.app_data.lock().containers.items[0].state = State::Paused;
         let fd = FrameData::from((&setup.app_data, &setup.gui_state));
 
@@ -336,6 +335,7 @@ mod tests {
             .unwrap();
 
         assert_snapshot!(setup.terminal.backend());
+        //
 
         for (row_index, result_row) in get_result(&setup) {
             for (result_cell_index, result_cell) in result_row.iter().enumerate() {
@@ -369,7 +369,7 @@ mod tests {
     /// When dead, text is red
     fn test_draw_blocks_charts_dead() {
         let mut setup = test_setup(80, 10, true, true);
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         setup.app_data.lock().containers.items[0].state = State::Dead;
         let fd = FrameData::from((&setup.app_data, &setup.gui_state));
 
@@ -429,7 +429,7 @@ mod tests {
 
         let mut setup = test_setup(80, 10, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         let fd = FrameData::from((&setup.app_data, &setup.gui_state));
 
         setup

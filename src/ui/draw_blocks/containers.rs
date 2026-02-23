@@ -82,11 +82,19 @@ fn format_containers<'a>(colors: AppColors, i: &ContainerItem, widths: &Columns)
             colors.containers.text,
         ),
         Span::styled(
-            format!("{:>width$}{MARGIN}", i.rx, width = widths.net_rx.1.into()),
+            format!(
+                "{:>width$}{MARGIN}",
+                i.rx.current_total(),
+                width = widths.net_rx.1.into()
+            ),
             Style::default().fg(colors.containers.text_rx),
         ),
         Span::styled(
-            format!("{:>width$}{MARGIN}", i.tx, width = widths.net_tx.1.into()),
+            format!(
+                "{:>width$}{MARGIN}",
+                i.tx.current_total(),
+                width = widths.net_tx.1.into()
+            ),
             Style::default().fg(colors.containers.text_tx),
         ),
     ])

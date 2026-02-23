@@ -42,8 +42,9 @@ optional_config_struct!(
     exec,
     filter_mode,
     force_redraw,
-    log_scroll_back,
-    log_scroll_forward,
+    inspect,
+    scroll_back,
+    scroll_forward,
     log_search_mode,
     log_section_height_decrease,
     log_section_height_increase,
@@ -77,9 +78,10 @@ config_struct!(
     delete_deny,
     exec,
     filter_mode,
+    inspect,
     force_redraw,
-    log_scroll_back,
-    log_scroll_forward,
+    scroll_back,
+    scroll_forward,
     log_search_mode,
     log_section_height_decrease,
     log_section_height_increase,
@@ -113,10 +115,11 @@ impl Keymap {
             delete_confirm: (KeyCode::Char('y'), None),
             delete_deny: (KeyCode::Char('n'), None),
             exec: (KeyCode::Char('e'), None),
+            inspect: (KeyCode::Char('i'), None),
             filter_mode: (KeyCode::Char('/'), Some(KeyCode::F(1))),
             force_redraw: (KeyCode::Char('f'), None),
-            log_scroll_back: (KeyCode::Left, None),
-            log_scroll_forward: (KeyCode::Right, None),
+            scroll_back: (KeyCode::Left, None),
+            scroll_forward: (KeyCode::Right, None),
             log_search_mode: (KeyCode::Char('#'), None),
             log_section_height_decrease: (KeyCode::Char('-'), None),
             log_section_height_increase: (KeyCode::Char('='), None),
@@ -158,20 +161,20 @@ impl From<Option<ConfigKeymap>> for Keymap {
             |vec_str: Option<Vec<String>>,
              keymap_field: &mut (KeyCode, Option<KeyCode>),
              keymap_clash: &mut HashSet<KeyCode>| {
-                if let Some(vec_str) = vec_str {
-                    if let Some(vec_keycode) = Self::try_parse_keycode(&vec_str) {
-                        if let Some(first) = vec_keycode.first() {
-                            keymap_clash.insert(*first);
-                            counter += 1;
-                            keymap_field.0 = *first;
-                        }
-                        if let Some(second) = vec_keycode.get(1) {
-                            keymap_clash.insert(*second);
-                            counter += 1;
-                            keymap_field.1 = Some(*second);
-                        } else {
-                            keymap_field.1 = None;
-                        }
+                if let Some(vec_str) = vec_str
+                    && let Some(vec_keycode) = Self::try_parse_keycode(&vec_str)
+                {
+                    if let Some(first) = vec_keycode.first() {
+                        keymap_clash.insert(*first);
+                        counter += 1;
+                        keymap_field.0 = *first;
+                    }
+                    if let Some(second) = vec_keycode.get(1) {
+                        keymap_clash.insert(*second);
+                        counter += 1;
+                        keymap_field.1 = Some(*second);
+                    } else {
+                        keymap_field.1 = None;
                     }
                 }
             };
@@ -206,12 +209,8 @@ impl From<Option<ConfigKeymap>> for Keymap {
             update_keymap(ck.scroll_start, &mut keymap.scroll_start, &mut clash);
             update_keymap(ck.scroll_up, &mut keymap.scroll_up, &mut clash);
             update_keymap(ck.log_search_mode, &mut keymap.log_search_mode, &mut clash);
-            update_keymap(
-                ck.log_scroll_forward,
-                &mut keymap.log_scroll_forward,
-                &mut clash,
-            );
-            update_keymap(ck.log_scroll_back, &mut keymap.log_scroll_back, &mut clash);
+            update_keymap(ck.scroll_forward, &mut keymap.scroll_forward, &mut clash);
+            update_keymap(ck.scroll_back, &mut keymap.scroll_back, &mut clash);
             update_keymap(
                 ck.select_next_panel,
                 &mut keymap.select_next_panel,
@@ -276,16 +275,16 @@ impl Keymap {
 
         for key in input.iter().take(2) {
             if key.chars().count() == 1 {
-                if let Some(first_char) = key.chars().next() {
-                    if let Some(first_char) = match first_char {
+                if let Some(first_char) = key.chars().next()
+                    && let Some(first_char) = match first_char {
                         x if x.is_ascii_alphabetic() || x.is_ascii_digit() => Some(first_char),
                         '/' | '\\' | ',' | '.' | '#' | '\'' | '[' | ']' | ';' | '=' | '-' => {
                             Some(first_char)
                         }
                         _ => None,
-                    } {
-                        output.push(KeyCode::Char(first_char));
                     }
+                {
+                    output.push(KeyCode::Char(first_char));
                 }
             } else {
                 let keycode = match key.to_lowercase().as_str() {
@@ -327,7 +326,7 @@ impl Keymap {
         if output.is_empty() {
             None
         } else {
-            // Remove any duplicates for a single deinition
+            // Remove any duplicates for a single definition
             if output.first() == output.get(1) {
                 output.pop();
             }
@@ -395,9 +394,10 @@ mod tests {
             exec: None,
             filter_mode: None,
             force_redraw: None,
-            log_scroll_back: None,
+            inspect: None,
+            scroll_back: None,
             log_search_mode: None,
-            log_scroll_forward: None,
+            scroll_forward: None,
             log_section_height_decrease: None,
             log_section_height_increase: None,
             log_section_toggle: None,
@@ -441,8 +441,9 @@ mod tests {
             exec: gen_v(("g", "h")),
             filter_mode: gen_v(("i", "j")),
             force_redraw: gen_v(("k", "l")),
-            log_scroll_back: gen_v(("s", "t")),
-            log_scroll_forward: gen_v(("q", "r")),
+            inspect: gen_v(("m", "n")),
+            scroll_back: gen_v(("s", "t")),
+            scroll_forward: gen_v(("q", "r")),
             log_search_mode: gen_v(("1", "2")),
             log_section_height_decrease: gen_v(("m", "n")),
             log_section_height_increase: gen_v(("o", "p")),
@@ -479,8 +480,9 @@ mod tests {
             exec: (KeyCode::Char('g'), Some(KeyCode::Char('h'))),
             filter_mode: (KeyCode::Char('i'), Some(KeyCode::Char('j'))),
             force_redraw: (KeyCode::Char('k'), Some(KeyCode::Char('l'))),
-            log_scroll_back: (KeyCode::Char('s'), Some(KeyCode::Char('t'))),
-            log_scroll_forward: (KeyCode::Char('q'), Some(KeyCode::Char('r'))),
+            inspect: (KeyCode::Char('i'), None),
+            scroll_back: (KeyCode::Char('s'), Some(KeyCode::Char('t'))),
+            scroll_forward: (KeyCode::Char('q'), Some(KeyCode::Char('r'))),
             log_search_mode: (KeyCode::Char('1'), Some(KeyCode::Char('2'))),
             log_section_height_decrease: (KeyCode::Char('m'), Some(KeyCode::Char('n'))),
             log_section_height_increase: (KeyCode::Char('o'), Some(KeyCode::Char('p'))),

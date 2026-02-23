@@ -10,10 +10,12 @@
 </p>
 
 <p align='center'>
+	<!-- ffmpeg -i input.mp4 -vf "scale='min(1000,iw)':-1:flags=lanczos,fps=2" -vcodec libwebp -lossless 0 -compression_level 4 -q:v 85 -loop 0 demo_01.webp -->
 	<a href='https://raw.githubusercontent.com/mrjackwills/oxker/main/.github/demo_01.webp' target='_blank' rel='noopener noreferrer'>
 		<img src='./.github/demo_01.webp' width='100%' alt='An animated demo of oxker in operation'/>
 	</a>
 	<sub>
+		<!-- TODO update this -->
 		<a href="https://raw.githubusercontent.com/mrjackwills/oxker/main/.github/screenshot_01.png" target='_blank' rel='noopener noreferrer'>
 			link to alternative screenshot
 		</a>
@@ -111,7 +113,7 @@ In application controls, these, amongst many other settings, can be customized w
 |--|--|
 | ```( tab )``` or ```( shift+tab )``` | Change panel, clicking on a panel also changes the selected panel.|
 | ```( ↑ ↓ )``` or ```( j k )``` or ```( Home End )```| Scroll line in selected panel - mouse wheel will also scroll.|
-| ```( ← → )``` | When logs panel selected, scroll horizontally across the text of the logs.|
+| ```( ← → )``` | Scroll horizontally across text.|
 | ```( ctrl )``` | Increase scroll speed, used in conjunction with scroll keys.|
 | ```( enter )```| Run selected docker command.|
 | ```( 1-9 )``` | Sort containers by heading, clicking on headings also sorts the selected column. |
@@ -121,6 +123,7 @@ In application controls, these, amongst many other settings, can be customized w
 | ```( - ) ``` or ```(=)``` | Reduce or increase the height of the logs panel.|
 | ```( \ )``` | Toggle the visibility of the logs panel.|
 | ```( e )``` | Exec into the selected container - not available on Windows.|
+| ```( i )``` | Enter container inspect mode. |
 | ```( f )``` | Force clear the screen & redraw the gui.|
 | ```( h )``` | Toggle help menu.|
 | ```( m )``` | Toggle mouse capture - if disabled, text on screen can be selected.|

@@ -81,7 +81,7 @@ pub struct ConfigFile {
 
 impl ConfigFile {
     /// Attempt to create a config.toml file, will attempt to recursively create the directories as well
-    fn crate_config_file(in_container: bool) -> Result<(), AppError> {
+    fn create_config_file(in_container: bool) -> Result<(), AppError> {
         if in_container {
             return Ok(());
         }
@@ -146,28 +146,26 @@ impl ConfigFile {
 
     /// Parse a config file using default config_file location
     /// This is executed first, then the CLI args are read, and if they contain a "--config-file" entry, then Self::try_parse_from_file() is executed
-    pub fn try_parse(in_container: bool) -> Option<Self> {
-        let mut config = None;
+    pub fn try_parse(in_container: bool) -> Option<(Self, PathBuf)> {
+        let mut output = None;
         for file_format in [
             ConfigFileFormat::Toml,
             ConfigFileFormat::Jsonc,
             ConfigFileFormat::JsoncAsJson,
             ConfigFileFormat::Json,
         ] {
-            if let Ok(config_file) = Self::parse_config_file(
-                file_format,
-                &file_format.get_default_path_name(in_container),
-            ) {
-                config = Some(config_file);
+            let path = file_format.get_default_path_name(in_container);
+            if let Ok(config_file) = Self::parse_config_file(file_format, &path) {
+                output = Some((config_file, path));
                 break;
             }
         }
 
-        if config.is_none() {
-            Self::crate_config_file(in_container).ok();
+        if output.is_none() {
+            Self::create_config_file(in_container).ok();
         }
 
-        config
+        output
     }
 }
 

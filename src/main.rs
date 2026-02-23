@@ -1,4 +1,3 @@
-#![allow(clippy::collapsible_if)]
 // #![allow(unused)]
 // Zigbuild is stuck on 1.87.0, which means Mac builds won't work when using collapsible ifs
 
@@ -43,12 +42,18 @@ fn setup_tracing() {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 }
 
-/// Read the optional docker_host path, the cli args take priority over the DOCKER_HOST env
+/// Read the optional docker_host path
+/// Bollard will use DOCKER_HOST env, so might be pointless here, although it will fix it's priority over any config setting
 fn read_docker_host(config: &Config) -> Option<String> {
-    config
-        .host
-        .as_ref()
-        .map_or_else(|| std::env::var(DOCKER_HOST).ok(), |x| Some(x.to_string()))
+    if let Some(x) = &config.host {
+        Some(x.to_string())
+    } else if let Ok(env) = std::env::var(DOCKER_HOST)
+        && !env.trim().is_empty()
+    {
+        Some(env)
+    } else {
+        None
+    }
 }
 
 /// Create docker daemon handler, and only spawn up the docker data handler if a ping returns non-error
@@ -60,25 +65,27 @@ async fn docker_init(
 ) {
     let host = read_docker_host(&app_data.lock().config);
 
-    let connection = host.map_or_else(Docker::connect_with_socket_defaults, |host| {
-        Docker::connect_with_socket(&host, 120, API_DEFAULT_VERSION)
-    });
-
-    if let Ok(docker) = connection {
-        if docker.ping().await.is_ok() {
-            tokio::spawn(DockerData::start(
-                Arc::clone(app_data),
-                docker,
-                docker_rx,
-                docker_tx,
-                Arc::clone(gui_state),
-            ));
-            return;
-        }
+    if let Ok(docker) = host
+        .as_ref()
+        .map_or_else(Docker::connect_with_defaults, |host| {
+            Docker::connect_with_socket(host, 120, API_DEFAULT_VERSION)
+        })
+        && docker.ping().await.is_ok()
+    {
+        tokio::spawn(DockerData::start(
+            Arc::clone(app_data),
+            docker,
+            docker_rx,
+            docker_tx,
+            Arc::clone(gui_state),
+        ));
+    } else {
+        app_data.lock().set_error(
+            AppError::DockerConnect,
+            gui_state,
+            Status::DockerConnect(host),
+        );
     }
-    app_data
-        .lock()
-        .set_error(AppError::DockerConnect, gui_state, Status::DockerConnect);
 }
 
 /// Create data for, and then spawn a tokio thread, for the input handler
@@ -155,7 +162,7 @@ mod tests {
 
     use std::{str::FromStr, sync::Arc};
 
-    use bollard::service::{ContainerSummary, Port};
+    use bollard::service::{ContainerSummary, PortSummary};
 
     use crate::{
         app_data::{
@@ -169,23 +176,24 @@ mod tests {
     /// Default test config, has timestamps turned off
     pub fn gen_config() -> Config {
         Config {
+            app_colors: AppColors::new(),
             color_logs: false,
+            dir_save: None,
+            dir_config: None,
             docker_interval_ms: 1000,
             gui: true,
             host: None,
-            show_std_err: false,
             in_container: false,
-            save_dir: None,
+            keymap: Keymap::new(),
             log_search_case_sensitive: true,
             raw_logs: false,
-            show_self: false,
-            app_colors: AppColors::new(),
-            keymap: Keymap::new(),
-            timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
-            show_timestamp: false,
-            use_cli: false,
             show_logs: true,
+            show_self: false,
+            show_std_err: false,
+            show_timestamp: false,
+            timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
             timezone: None,
+            use_cli: false,
         }
     }
 
@@ -211,6 +219,7 @@ mod tests {
             containers: StatefulList::new(containers.to_vec()),
             hidden_containers: vec![],
             current_sorted_id: vec![],
+            inspect_data: None,
             error: None,
             sorted_by: None,
             rerender: Arc::new(Rerender::new()),
@@ -234,13 +243,14 @@ mod tests {
     pub fn gen_container_summary(index: usize, state: &str) -> ContainerSummary {
         ContainerSummary {
             image_manifest_descriptor: None,
+            health: None,
             id: Some(format!("{index}")),
             names: Some(vec![format!("container_{}", index)]),
             image: Some(format!("image_{index}")),
             image_id: Some(format!("{index}")),
             command: None,
             created: Some(i64::try_from(index).unwrap()),
-            ports: Some(vec![Port {
+            ports: Some(vec![PortSummary {
                 ip: None,
                 private_port: u16::try_from(index).unwrap_or(1) + 8000,
                 public_port: None,

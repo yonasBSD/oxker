@@ -1,5 +1,8 @@
 use ratatui::style::Color;
 
+static COLOR_RX: Color = Color::Rgb(255, 233, 193);
+static COLOR_TX: Color = Color::Rgb(205, 140, 140);
+
 /// The macro accepts a list of struct names with key names
 /// Returns a struct where every key name is an Option<String>, with the correct derived attributes
 macro_rules! optional_config_struct {
@@ -58,7 +61,7 @@ impl From<Option<ConfigColors>> for AppColors {
                 );
             }
 
-            // Seletable panel borders
+            // Selectable panel borders
             if let Some(b) = config_colors.borders {
                 Self::map_color(b.selected.as_deref(), &mut app_colors.borders.selected);
                 Self::map_color(b.unselected.as_deref(), &mut app_colors.borders.unselected);
@@ -249,6 +252,8 @@ optional_config_struct!(
     ConfigBackgroundText, background, text;
     ConfigBackgroundTextHighlight, background, text, text_highlight;
     ConfigBorders, selected, unselected;
+    ConfigChartBandwidth, background, border, max_rx, max_tx, title_tx, title_rx, points_rx, points_tx, y_axis;
+
     ConfigChartCpu, background, border, order, title, max, points,y_axis;
     ConfigChartMemory, background, border, title, max, points, y_axis;
     ConfigChartPorts, background, border, title, headings, text;
@@ -265,6 +270,8 @@ config_struct!(
     Borders, selected, unselected;
     ChartCpu, background, border, title, max, points, y_axis;
     ChartMemory, background, border, title, max, points, y_axis;
+    ChartBandwidth, background, border, max_rx, max_tx, title_rx, title_tx, points_rx, points_tx, y_axis;
+
     ChartPorts, background, border, title, headings, text;
     Commands, background, pause, restart, stop, delete, resume, start;
     Containers, background, icon, text, text_rx, text_tx;
@@ -284,6 +291,7 @@ pub struct ConfigColors {
     borders: Option<ConfigBorders>,
     chart_cpu: Option<ConfigChartCpu>,
     chart_memory: Option<ConfigChartMemory>,
+    chart_bandwidth: Option<ConfigChartBandwidth>,
     chart_ports: Option<ConfigChartPorts>,
     commands: Option<ConfigCommands>,
     container_state: Option<ConfigContainerState>,
@@ -335,7 +343,24 @@ impl Commands {
     }
 }
 
-/// Default colours for the help popup
+/// Default colours for the Bandwidth chart
+impl ChartBandwidth {
+    const fn new() -> Self {
+        Self {
+            background: Color::Reset,
+            border: Color::White,
+            max_rx: COLOR_RX,
+            title_rx: COLOR_RX,
+            title_tx: COLOR_TX,
+            max_tx: COLOR_TX,
+            points_rx: COLOR_RX,
+            points_tx: COLOR_TX,
+            y_axis: Color::White,
+        }
+    }
+}
+
+/// Default colours for the CPU chart
 impl ChartCpu {
     const fn new() -> Self {
         Self {
@@ -383,8 +408,8 @@ impl Containers {
             background: Color::Reset,
             icon: Color::White,
             text: Color::Blue,
-            text_rx: Color::Rgb(255, 233, 193),
-            text_tx: Color::Rgb(205, 140, 140),
+            text_rx: COLOR_RX,
+            text_tx: COLOR_TX,
         }
     }
 }
@@ -487,6 +512,7 @@ pub struct AppColors {
     pub borders: Borders,
     pub chart_cpu: ChartCpu,
     pub chart_memory: ChartMemory,
+    pub chart_bandwidth: ChartBandwidth,
     pub chart_ports: ChartPorts,
     pub commands: Commands,
     pub container_state: ContainerState,
@@ -507,6 +533,7 @@ impl AppColors {
             borders: Borders::new(),
             chart_cpu: ChartCpu::new(),
             chart_memory: ChartMemory::new(),
+            chart_bandwidth: ChartBandwidth::new(),
             chart_ports: ChartPorts::new(),
             commands: Commands::new(),
             container_state: ContainerState::new(),

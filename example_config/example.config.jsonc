@@ -18,8 +18,8 @@
 	"show_timestamp": true,
 	// Don't draw gui - for debugging - mostly pointless
 	"gui": true,
-	// Docker host location
-	"host": "/var/run/docker.sock",
+	// Docker host location. Will take priority over a DOCKER_HOST env.
+	// "host": "/var/run/docker.sock",
 	// Display the timestamp in a custom format, if given option is invalid, it will default to %Y-%m-%dT%H:%M:%S.%8f -> 2025-02-18T12:34:56.01234567
 	// *Should* accept any valid strftime string up to 32 chars, see https://strftime.org/
 	"timestamp_format": "%Y-%m-%dT%H:%M:%S.%8f",
@@ -104,10 +104,10 @@
 			"k"
 		],
 		// Horizontal scroll of the logs
-		"log_scroll_forward": [
+		"scroll_forward": [
 			"right"
 		],
-		"log_scroll_back": [
+		"scroll_back": [
 			"left"
 		],
 		// Select next panel
@@ -169,6 +169,10 @@
 		// Toggle visibility of the log section
 		"log_section_toggle": [
 			"\\"
+		],
+		// Toggle to inspect container screen
+		"inspect": [
+			"i"
 		],
 		// Force a complete clear & redraw of the screen
 		"force_redraw": [
@@ -279,6 +283,27 @@
 			"headings": "yellow",
 			// Ports & IP listing text
 			"text": "white"
+		},
+		// The bandwidth chart
+		"chart_bandwidth": {
+			//Background color of panel
+			"background": "reset",
+			// Border color
+			"border": "white",
+			// Maximum RX value - again paused & stopped colors not yet customizable
+			"max_rx": "#FFE9C1",
+			// # Maximum TX value - again paused & stopped colors not yet customizable
+			"max_tx": "#CD8C8C",
+			// RX points on the chart - again paused & stopped colors not yet customizable
+			"points_rx": "#FFE9C1",
+			// TX points on the chart - again paused & stopped colors not yet customizable
+			"points_tx": "#CD8C8C",
+			// RX title color
+			"title_rx": "#FFE9C1",
+			// TX title color
+			"title_tx": "#CD8C8C",
+			// The charts y-axis
+			"y_axis": "white"
 		},
 		// The filter panel
 		"filter": {

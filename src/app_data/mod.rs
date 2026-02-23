@@ -1,4 +1,4 @@
-use bollard::models::ContainerSummary;
+use bollard::{models::ContainerSummary, secret::ContainerInspectResponse};
 use core::fmt;
 use parking_lot::Mutex;
 use ratatui::{layout::Size, text::Text, widgets::ListState};
@@ -114,6 +114,45 @@ impl Filter {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct InspectData {
+    pub width: usize,
+    pub height: usize,
+    pub as_string: String,
+    pub name: String,
+    pub id: ContainerId, // pub as_lines: Vec<Line<'a>>,
+}
+
+impl From<ContainerInspectResponse> for InspectData {
+    fn from(input: ContainerInspectResponse) -> Self {
+        let as_string = serde_json::to_string_pretty(&input)
+            .unwrap_or_default()
+            .lines()
+            .skip(1)
+            .collect::<Vec<_>>()
+            .split_last()
+            .map(|(_, data)| data)
+            .unwrap_or_default()
+            .join("\n");
+
+        let height = as_string.lines().count();
+
+        let mut width = 0;
+        for i in as_string.lines() {
+            width = width.max(i.chars().count());
+        }
+
+        Self {
+            name: input.name.unwrap_or_default(),
+            // TODO maybe make this an Option<Id>?
+            id: ContainerId::from(input.id.unwrap_or_default().as_str()),
+            width,
+            height,
+            as_string,
+        }
+    }
+}
+
 /// Global app_state, stored in an Arc<Mutex>
 #[derive(Debug, Clone)]
 #[cfg(not(test))]
@@ -122,6 +161,7 @@ pub struct AppData {
     error: Option<AppError>,
     filter: Filter,
     hidden_containers: Vec<ContainerItem>,
+    inspect_data: Option<InspectData>,
     rerender: Arc<Rerender>,
     sorted_by: Option<(Header, SortedOrder)>,
     current_sorted_id: Vec<ContainerId>,
@@ -136,6 +176,7 @@ pub struct AppData {
     pub error: Option<AppError>,
     pub filter: Filter,
     pub hidden_containers: Vec<ContainerItem>,
+    pub inspect_data: Option<InspectData>,
     pub current_sorted_id: Vec<ContainerId>,
     pub rerender: Arc<Rerender>,
     pub sorted_by: Option<(Header, SortedOrder)>,
@@ -151,6 +192,7 @@ impl AppData {
             error: None,
             filter: Filter::new(),
             hidden_containers: vec![],
+            inspect_data: None,
             rerender: Arc::clone(redraw),
             sorted_by: None,
         }
@@ -165,6 +207,18 @@ impl AppData {
             .as_secs()
     }
 
+    pub fn clear_inspect_data(&mut self) {
+        self.inspect_data = None;
+    }
+
+    pub fn set_inspect_data(&mut self, data: ContainerInspectResponse) {
+        self.inspect_data = Some(InspectData::from(data))
+        // self.inspect_data = Some(data)
+    }
+
+    pub fn get_inspect_data(&self) -> Option<InspectData> {
+        self.inspect_data.clone()
+    }
     /// Filter related methods
     /// Get the filterby and filter_term
     pub const fn get_filter(&self) -> (FilterBy, Option<&String>) {
@@ -172,10 +226,10 @@ impl AppData {
     }
 
     pub fn log_search_scroll(&mut self, np: &ScrollDirection) {
-        if let Some(i) = self.get_mut_selected_container() {
-            if i.logs.search_scroll(np).is_some() {
-                self.rerender.update_draw();
-            }
+        if let Some(i) = self.get_mut_selected_container()
+            && i.logs.search_scroll(np).is_some()
+        {
+            self.rerender.update_draw();
         }
     }
 
@@ -329,6 +383,7 @@ impl AppData {
                 .iter()
                 .position(|i| self.get_selected_container_id().as_ref() == Some(&i.id)),
         );
+        self.rerender.update_draw();
     }
 
     /// Remove the sorted header & order, and sort by default - created datetime
@@ -340,12 +395,12 @@ impl AppData {
     /// Sort containers based on a given header, if headings match, and already ascending, remove sorting
     pub fn set_sort_by_header(&mut self, selected_header: Header) {
         let mut output = Some((selected_header, SortedOrder::Asc));
-        if let Some((current_header, order)) = self.get_sorted() {
-            if current_header == selected_header {
-                match order {
-                    SortedOrder::Desc => output = None,
-                    SortedOrder::Asc => output = Some((selected_header, SortedOrder::Desc)),
-                }
+        if let Some((current_header, order)) = self.get_sorted()
+            && current_header == selected_header
+        {
+            match order {
+                SortedOrder::Desc => output = None,
+                SortedOrder::Asc => output = Some((selected_header, SortedOrder::Desc)),
             }
         }
         self.set_sorted(output);
@@ -412,12 +467,14 @@ impl AppData {
                     Header::Rx => item_ord
                         .0
                         .rx
-                        .cmp(&item_ord.1.rx)
+                        .current_total()
+                        .cmp(&item_ord.1.rx.current_total())
                         .then_with(|| item_ord.0.name.get().cmp(item_ord.1.name.get())),
                     Header::Tx => item_ord
                         .0
                         .tx
-                        .cmp(&item_ord.1.tx)
+                        .current_total()
+                        .cmp(&item_ord.1.tx.current_total())
                         .then_with(|| item_ord.0.name.get().cmp(item_ord.1.name.get())),
                     Header::Name => item_ord
                         .0
@@ -459,7 +516,6 @@ impl AppData {
 
     /// Get all the ContainerItems
     /// Thnk this allow block can be removed with the 1.87 release of Clippy
-    #[allow(clippy::missing_const_for_fn)]
     pub fn get_container_items(&self) -> &[ContainerItem] {
         &self.containers.items
     }
@@ -556,7 +612,14 @@ impl AppData {
     }
 
     /// Get a mutable container by given id
+    #[cfg(not(test))]
     fn get_container_by_id(&mut self, id: &ContainerId) -> Option<&mut ContainerItem> {
+        self.containers.items.iter_mut().find(|i| &i.id == id)
+    }
+
+    /// As above, but make it public to testing
+    #[cfg(test)]
+    pub fn get_container_by_id(&mut self, id: &ContainerId) -> Option<&mut ContainerItem> {
         self.containers.items.iter_mut().find(|i| &i.id == id)
     }
 
@@ -637,7 +700,7 @@ impl AppData {
             .map(|i| &mut i.docker_controls.state)
     }
 
-    /// Get mutable Option of the currently selected container DockerConmand items
+    /// Get mutable Option of the currently selected container DockerCommand items
     pub fn get_control_items(&mut self) -> Option<&mut Vec<DockerCommand>> {
         self.get_mut_selected_container()
             .map(|i| &mut i.docker_controls.items)
@@ -668,19 +731,22 @@ impl AppData {
     }
 
     pub fn logs_horizontal_scroll(&mut self, sd: &ScrollDirection, width: u16) {
+        // Change this to set a max_offset, instead of taking in width each time, then can be combined with the log_scroll beneath
         match sd {
-            ScrollDirection::Next => {
+            ScrollDirection::Down => {
                 if let Some(i) = self.get_mut_selected_container() {
                     i.logs.forward(width);
                     self.rerender.update_draw();
                 }
             }
-            ScrollDirection::Previous => {
+            ScrollDirection::Up => {
                 if let Some(i) = self.get_mut_selected_container() {
                     i.logs.back();
                     self.rerender.update_draw();
                 }
             }
+            // TODO set offset
+            _ => (),
         }
     }
 
@@ -688,8 +754,10 @@ impl AppData {
     pub fn log_scroll(&mut self, scroll: &ScrollDirection) {
         if let Some(i) = self.get_mut_selected_container() {
             match scroll {
-                ScrollDirection::Next => i.logs.next(),
-                ScrollDirection::Previous => i.logs.previous(),
+                ScrollDirection::Down => i.logs.next(),
+                ScrollDirection::Up => i.logs.previous(),
+                // TODO set offset
+                _ => (),
             }
             self.rerender.update_draw();
         }
@@ -731,7 +799,7 @@ impl AppData {
 
     /// Chart data related methods
     /// Get mutable Option of the currently selected container chart data
-    pub fn get_chart_data(&self) -> Option<(CpuTuple, MemTuple)> {
+    pub fn get_chart_data(&self) -> Option<ChartsData> {
         self.containers
             .state
             .selected()
@@ -780,6 +848,7 @@ impl AppData {
 
         for container in [&self.containers.items, &self.hidden_containers] {
             for container in container {
+                // TODO refactor these
                 let cpu_count = container.cpu_stats.back().map_or_else(
                     || count(&CpuStats::default().to_string()),
                     |i| count(&i.to_string()),
@@ -789,14 +858,19 @@ impl AppData {
                     || count(&ByteStats::default().to_string()),
                     |i| count(&i.to_string()),
                 );
-
                 columns.cpu.1 = columns.cpu.1.max(cpu_count);
                 columns.image.1 = columns.image.1.max(count(&container.image.to_string()));
                 columns.mem.1 = columns.mem.1.max(mem_current_count);
                 columns.mem.2 = columns.mem.2.max(count(&container.mem_limit.to_string()));
                 columns.name.1 = columns.name.1.max(count(&container.name.to_string()));
-                columns.net_rx.1 = columns.net_rx.1.max(count(&container.rx.to_string()));
-                columns.net_tx.1 = columns.net_tx.1.max(count(&container.tx.to_string()));
+                columns.net_rx.1 = columns
+                    .net_rx
+                    .1
+                    .max(count(&container.rx.current_total().to_string()));
+                columns.net_tx.1 = columns
+                    .net_tx
+                    .1
+                    .max(count(&container.tx.current_total().to_string()));
                 columns.state.1 = columns.state.1.max(count(&container.state.to_string()));
                 columns.status.1 = columns.status.1.max(count(container.status.get()));
             }
@@ -840,8 +914,12 @@ impl AppData {
                 container.mem_stats.push_back(ByteStats::new(mem));
             }
 
-            container.rx.update(rx);
-            container.tx.update(tx);
+            // Only insert if alive, or if is empty, need two to create an entry in the bandwidth chart, so instead this fills in the RX/TX total columns
+            if container.rx.is_empty() || container.state.is_alive() {
+                container.rx.push(rx);
+                container.tx.push(tx);
+            }
+
             container.mem_limit.update(mem_limit);
         }
         if self.is_selected_container(id) {
@@ -877,7 +955,7 @@ impl AppData {
                 // If removed container is currently selected, then change selected to previous
                 // This will default to 0 in any edge cases
                 if self.containers.state.selected().is_some() {
-                    self.containers.scroll(&ScrollDirection::Previous);
+                    self.containers.scroll(&ScrollDirection::Up);
                 }
                 // Check is some, else can cause out of bounds error, if containers get removed before a docker update
                 if self.containers.items.get(index).is_some() {
@@ -896,7 +974,7 @@ impl AppData {
                         if f.starts_with('/') {
                             f.remove(0);
                         }
-                        (*f).to_string()
+                        (*f).clone()
                     })
                 });
 
@@ -1277,13 +1355,16 @@ mod tests {
         assert_eq!(result, &containers);
 
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("1")) {
-            i.rx = ByteStats::new(40);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(40);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("2")) {
-            i.rx = ByteStats::new(80);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(80);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("3")) {
-            i.rx = ByteStats::new(2);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(2);
         }
 
         // descending
@@ -1314,13 +1395,16 @@ mod tests {
         assert_eq!(result, &containers);
 
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("1")) {
-            i.rx = ByteStats::new(400);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(400);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("2")) {
-            i.rx = ByteStats::new(80);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(80);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("3")) {
-            i.rx = ByteStats::new(83);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(83);
         }
 
         // descending
@@ -1378,13 +1462,16 @@ mod tests {
         assert_eq!(result, &containers);
 
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("1")) {
-            i.rx = ByteStats::new(400);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(400);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("2")) {
-            i.rx = ByteStats::new(80);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(80);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("3")) {
-            i.rx = ByteStats::new(83);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(83);
         }
 
         app_data.set_sorted(Some((Header::Rx, SortedOrder::Asc)));
@@ -1444,7 +1531,7 @@ mod tests {
         );
 
         // Calling previous when at start has no effect
-        app_data.containers_scroll(&ScrollDirection::Previous);
+        app_data.containers_scroll(&ScrollDirection::Up);
         let result = app_data.get_selected_container_id();
         assert_eq!(result, Some(ContainerId::from("1")));
         let result = app_data.get_selected_container_id_state_name();
@@ -1467,7 +1554,7 @@ mod tests {
 
         // Advance list state by 1
         app_data.containers_start();
-        app_data.containers.scroll(&ScrollDirection::Next);
+        app_data.containers.scroll(&ScrollDirection::Down);
 
         let result = app_data.get_container_state();
         assert_eq!(result.selected(), Some(1));
@@ -1511,7 +1598,7 @@ mod tests {
         );
 
         // Calling previous when at end has no effect
-        app_data.containers.scroll(&ScrollDirection::Next);
+        app_data.containers.scroll(&ScrollDirection::Down);
         let result = app_data.get_selected_container_id();
         assert_eq!(result, Some(ContainerId::from("3")));
         let result = app_data.get_selected_container_id_state_name();
@@ -1532,7 +1619,7 @@ mod tests {
         let mut app_data = gen_appdata(&containers);
 
         app_data.containers_end();
-        app_data.containers.scroll(&ScrollDirection::Previous);
+        app_data.containers.scroll(&ScrollDirection::Up);
         let result = app_data.get_container_state();
         assert_eq!(result.selected(), Some(1));
         assert_eq!(result.offset(), 0);
@@ -1548,7 +1635,7 @@ mod tests {
         assert_eq!(result, None);
 
         app_data.containers.start();
-        app_data.containers.scroll(&ScrollDirection::Next);
+        app_data.containers.scroll(&ScrollDirection::Down);
 
         let result = app_data.get_selected_container();
         assert_eq!(result, Some(&containers[1]));
@@ -1635,7 +1722,7 @@ mod tests {
         let mut app_data = gen_appdata(&containers);
         app_data.containers_start();
         app_data.docker_controls_start();
-        app_data.docker_controls_scroll(&ScrollDirection::Next);
+        app_data.docker_controls_scroll(&ScrollDirection::Down);
 
         let result = app_data.selected_docker_controls();
         assert_eq!(result, Some(DockerCommand::Restart));
@@ -1653,7 +1740,7 @@ mod tests {
         assert_eq!(result, Some(DockerCommand::Delete));
 
         // Next has no effect when at end
-        app_data.docker_controls_scroll(&ScrollDirection::Next);
+        app_data.docker_controls_scroll(&ScrollDirection::Down);
         let result = app_data.selected_docker_controls();
         assert_eq!(result, Some(DockerCommand::Delete));
     }
@@ -1665,14 +1752,14 @@ mod tests {
         let mut app_data = gen_appdata(&containers);
         app_data.containers_start();
         app_data.docker_controls_end();
-        app_data.docker_controls_scroll(&ScrollDirection::Previous);
+        app_data.docker_controls_scroll(&ScrollDirection::Up);
 
         let result = app_data.selected_docker_controls();
         assert_eq!(result, Some(DockerCommand::Stop));
 
         // previous has no effect when at start
         app_data.docker_controls_start();
-        app_data.docker_controls_scroll(&ScrollDirection::Previous);
+        app_data.docker_controls_scroll(&ScrollDirection::Up);
         let result = app_data.selected_docker_controls();
         assert_eq!(result, Some(DockerCommand::Pause));
     }
@@ -1936,7 +2023,7 @@ mod tests {
         assert_eq!(result, " 3/3 - container_1 - image_1");
 
         // Change log state to no longer be at the end
-        app_data.log_scroll(&ScrollDirection::Previous);
+        app_data.log_scroll(&ScrollDirection::Up);
         let result = app_data.get_log_title();
         assert_eq!(result, " 2/3 - container_1 - image_1");
     }
@@ -1957,7 +2044,7 @@ mod tests {
         assert_eq!(result, " - container_1 - image_1");
 
         // change container
-        app_data.containers_scroll(&ScrollDirection::Next);
+        app_data.containers_scroll(&ScrollDirection::Down);
         let result = app_data.get_log_title();
         assert_eq!(result, " - container_2 - image_2");
 
@@ -1968,7 +2055,7 @@ mod tests {
         assert_eq!(result, " 3/3 - container_2 - image_2");
 
         // Change log state to no longer be at the end
-        app_data.log_scroll(&ScrollDirection::Previous);
+        app_data.log_scroll(&ScrollDirection::Up);
         let result = app_data.get_log_title();
         assert_eq!(result, " 2/3 - container_2 - image_2");
     }
@@ -2075,7 +2162,7 @@ mod tests {
         let result = app_data.get_log_title();
         assert_eq!(result, " 1/3 - container_1 - image_1");
 
-        app_data.log_scroll(&ScrollDirection::Next);
+        app_data.log_scroll(&ScrollDirection::Down);
         let result = app_data.get_log_state();
         assert!(result.is_some());
         assert_eq!(result.as_ref().unwrap().selected(), Some(1));
@@ -2084,7 +2171,7 @@ mod tests {
         let result = app_data.get_log_title();
         assert_eq!(result, " 2/3 - container_1 - image_1");
 
-        app_data.log_scroll(&ScrollDirection::Next);
+        app_data.log_scroll(&ScrollDirection::Down);
         let result = app_data.get_log_state();
         assert!(result.is_some());
         assert_eq!(result.as_ref().unwrap().selected(), Some(2));
@@ -2092,7 +2179,7 @@ mod tests {
 
         let result = app_data.get_log_title();
         assert_eq!(result, " 3/3 - container_1 - image_1");
-        app_data.log_scroll(&ScrollDirection::Next);
+        app_data.log_scroll(&ScrollDirection::Down);
 
         let result = app_data.get_log_state();
         assert!(result.is_some());
@@ -2123,7 +2210,7 @@ mod tests {
         let result = app_data.get_log_title();
         assert_eq!(result, " 3/3 - container_1 - image_1");
 
-        app_data.log_scroll(&ScrollDirection::Previous);
+        app_data.log_scroll(&ScrollDirection::Up);
 
         let result = app_data.get_log_state();
         assert!(result.is_some());
@@ -2132,7 +2219,7 @@ mod tests {
         let result = app_data.get_log_title();
         assert_eq!(result, " 2/3 - container_1 - image_1");
 
-        app_data.log_scroll(&ScrollDirection::Previous);
+        app_data.log_scroll(&ScrollDirection::Up);
         let result = app_data.get_log_state();
         assert!(result.is_some());
         assert_eq!(result.as_ref().unwrap().selected(), Some(0));
@@ -2140,7 +2227,7 @@ mod tests {
         let result = app_data.get_log_title();
         assert_eq!(result, " 1/3 - container_1 - image_1");
 
-        app_data.log_scroll(&ScrollDirection::Previous);
+        app_data.log_scroll(&ScrollDirection::Up);
         let result = app_data.get_log_state();
         assert!(result.is_some());
         assert_eq!(result.as_ref().unwrap().selected(), Some(0));
@@ -2164,26 +2251,49 @@ mod tests {
 
         app_data.containers_start();
 
+        let mut rx = NetworkBandwidth::new();
+        rx.push(200);
+        rx.push(100);
+        rx.push(200);
+
+        let mut tx = NetworkBandwidth::new();
+        tx.push(300);
+        tx.push(600);
+        tx.push(900);
+
         if let Some(item) = app_data.get_container_by_id(&ContainerId::from("1")) {
-            item.cpu_stats = VecDeque::from([CpuStats::new(1.1), CpuStats::new(1.2)]);
+            item.cpu_stats = VecDeque::from([CpuStats::new(1.2), CpuStats::new(1.2)]);
             item.mem_stats = VecDeque::from([ByteStats::new(1), ByteStats::new(2)]);
+            item.rx = rx;
+            item.tx = tx;
         }
 
         let result = app_data.get_chart_data();
         assert_eq!(
             result,
-            Some((
-                (
-                    vec![(0.0, 1.1), (1.0, 1.2)],
-                    CpuStats::new(1.2),
-                    State::Running(RunningState::Healthy),
-                ),
-                (
-                    vec![(0.0, 1.0), (1.0, 2.0)],
-                    ByteStats::new(2),
-                    State::Running(RunningState::Healthy),
-                )
-            ))
+            Some(ChartsData {
+                memory: ChartSeries {
+                    dataset: vec![(0.0, 1.0), (1.0, 2.0)],
+                    max: ByteStats::new(2),
+                    current: ByteStats::new(2)
+                },
+                cpu: ChartSeries {
+                    dataset: vec![(0.0, 1.2), (1.0, 1.2)],
+                    max: CpuStats::new(1.2),
+                    current: CpuStats::new(1.2)
+                },
+                rx: ChartSeries {
+                    dataset: vec![(0.0, 0.0), (1.0, 100.0)],
+                    max: BandwidthStat::new(100),
+                    current: BandwidthStat::new(100)
+                },
+                tx: ChartSeries {
+                    dataset: vec![(0.0, 300.0), (1.0, 300.0)],
+                    max: BandwidthStat::new(300),
+                    current: BandwidthStat::new(300)
+                },
+                state: State::Running(RunningState::Healthy)
+            })
         );
     }
 
@@ -2333,8 +2443,15 @@ mod tests {
         assert_eq!(result[0].cpu_stats, VecDeque::from([CpuStats::new(10.0)]));
         assert_eq!(result[0].mem_stats, VecDeque::from([ByteStats::new(10)]));
         assert_eq!(result[0].mem_limit, ByteStats::new(10));
-        assert_eq!(result[0].rx, ByteStats::new(10));
-        assert_eq!(result[0].tx, ByteStats::new(10));
+
+        let mut rx = NetworkBandwidth::new();
+        rx.push(10);
+        let mut tx = NetworkBandwidth::new();
+        tx.push(10);
+        assert_eq!(result[0].rx, rx);
+        // VecDeque::from([ByteStats::new(10)]));
+        assert_eq!(result[0].tx, tx);
+        // VecDeque::from([ByteStats::new(10)]));
     }
 
     #[test]
@@ -2434,7 +2551,7 @@ mod tests {
         }
 
         for _ in 0..=500 {
-            app_data.log_scroll(&ScrollDirection::Next);
+            app_data.log_scroll(&ScrollDirection::Down);
         }
         let result = app_data.get_logs(
             Size {
