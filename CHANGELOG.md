@@ -1,6 +1,7 @@
 *BREAKING CHANGES*
 + `log_scroll_forward`, `log_scroll_back` renamed to `scroll_forward`, `scroll_back`
-+ Docker Host priorites reordered, *should* now be, from high to low order,  `--host` cli argument, `config.toml` `host` value, `DOKER_HOST` env, [Docker library](https://github.com/fussybeaver/bollard) default setting.
++ Additional KeyMap entry, `inspect` defaults to `i`, enables Inspect mode
++ Docker Host priorites reordered, *should* now be, from high to low order,  `--host` cli argument, `config.toml` `host` value, `DOCKER_HOST` env, [Docker library](https://github.com/fussybeaver/bollard) default setting.
 + `config.toml` `host` value is now  commented out by default - this should help with invalid Docker connection errors and enable easy Podman support
 
 ### Chores

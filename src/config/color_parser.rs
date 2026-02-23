@@ -61,7 +61,7 @@ impl From<Option<ConfigColors>> for AppColors {
                 );
             }
 
-            // Seletable panel borders
+            // Selectable panel borders
             if let Some(b) = config_colors.borders {
                 Self::map_color(b.selected.as_deref(), &mut app_colors.borders.selected);
                 Self::map_color(b.unselected.as_deref(), &mut app_colors.borders.unselected);

@@ -326,7 +326,7 @@ impl Keymap {
         if output.is_empty() {
             None
         } else {
-            // Remove any duplicates for a single deinition
+            // Remove any duplicates for a single definition
             if output.first() == output.get(1) {
                 output.pop();
             }

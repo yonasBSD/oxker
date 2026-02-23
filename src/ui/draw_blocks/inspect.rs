@@ -439,7 +439,7 @@ mod tests {
     fn test_draw_blocks_inspect_offset() {
         let mut setup = test_setup(100, 50, true, true);
 
-        // Why does one need to draw first, although it *should* be impossible to scroll before an inital drawing
+        // Why does one need to draw first, although it *should* be impossible to scroll before an initial drawing
         setup
             .terminal
             .draw(|f| {
@@ -495,7 +495,7 @@ mod tests {
     fn test_draw_blocks_inspect_offset_max() {
         let mut setup = test_setup(100, 50, true, true);
 
-        // Why does one need to draw first, although it *should* be impossible to scroll before an inital drawing
+        // Why does one need to draw first, although it *should* be impossible to scroll before an initial drawing
         setup
             .terminal
             .draw(|f| {
