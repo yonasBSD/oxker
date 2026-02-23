@@ -40,10 +40,10 @@ serde_json = { version = "1.0"}
 serde_jsonc = "1.0"
 tokio = { version = "1.49", features = ["full"] }
 tokio-util = "0.7"
-toml = { version = "0.9", default-features = false, features = ["parse", "serde"] }
+toml = { version = "1.0", default-features = false, features = ["parse", "serde"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-uuid = { version = "1.20", features = ["fast-rng", "v4"] }
+uuid = { version = "1.21", features = ["fast-rng", "v4"] }
 
 [dev-dependencies]
 insta = "1.46"
