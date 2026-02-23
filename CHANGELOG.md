@@ -6,6 +6,7 @@
 
 ### Chores
 + dependencies updated, [4658a8de264698b0c8092e1227f0683527219a0b], [8b5899ca238bcbff32519b376b920cd7b7509809], [bebb687c59f3b408e69b23d2e68fa69f006a3231]
++ GitHub workflow updated, [a0aa7918241ee8f702d6472c620287aa4be7d56c]
 
 ### Features
 + Network chart, closes #79, [99fcb8fedf01599ec346b65d435d4c301a7a8851]
