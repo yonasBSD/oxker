@@ -171,7 +171,7 @@
 			"\\"
 		],
 		// Toggle to inspect container screen
-		"inspect":  [
+		"inspect": [
 			"i"
 		],
 		// Force a complete clear & redraw of the screen
@@ -283,6 +283,27 @@
 			"headings": "yellow",
 			// Ports & IP listing text
 			"text": "white"
+		},
+		// The bandwidth chart
+		"chart_bandwidth": {
+			//Background color of panel
+			"background": "reset",
+			// Border color
+			"border": "white",
+			// Maximum RX value - again paused & stopped colors not yet customizable
+			"max_rx": "#FFE9C1",
+			// # Maximum TX value - again paused & stopped colors not yet customizable
+			"max_tx": "#CD8C8C",
+			// RX points on the chart - again paused & stopped colors not yet customizable
+			"points_rx": "#FFE9C1",
+			// TX points on the chart - again paused & stopped colors not yet customizable
+			"points_tx": "#CD8C8C",
+			// RX title color
+			"title_rx": "#FFE9C1",
+			// TX title color
+			"title_tx": "#CD8C8C",
+			// The charts y-axis
+			"y_axis": "white"
 		},
 		// The filter panel
 		"filter": {

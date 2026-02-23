@@ -576,8 +576,116 @@ impl fmt::Display for ByteStats {
     }
 }
 
-pub type MemTuple = (Vec<(f64, f64)>, ByteStats, State);
-pub type CpuTuple = (Vec<(f64, f64)>, CpuStats, State);
+#[derive(Debug, Default, Clone, Copy, Eq)]
+pub struct BandwidthStat(u64);
+
+#[cfg(test)]
+impl BandwidthStat {
+    pub fn new(x: u64) -> Self {
+        Self(x)
+    }
+}
+
+impl PartialEq for BandwidthStat {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl PartialOrd for BandwidthStat {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for BandwidthStat {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+#[allow(clippy::cast_precision_loss)]
+impl Stats for BandwidthStat {
+    fn get_value(&self) -> f64 {
+        self.0 as f64
+    }
+}
+
+/// convert from bytes to per second, using 1000 instead of 1024
+impl fmt::Display for BandwidthStat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let as_f64 = self.get_value();
+        let p = match as_f64 {
+            x if x >= ONE_GB => format!("{y:.2} GB/s", y = as_f64 / ONE_GB),
+            x if x >= ONE_MB => format!("{y:.2} Mb/s", y = as_f64 / ONE_MB),
+            _ => format!("{y:.2} kb/s", y = as_f64 / ONE_KB),
+        };
+        write!(f, "{p:>x$}", x = f.width().unwrap_or(1))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NetworkBandwidth(VecDeque<BandwidthStat>);
+
+impl NetworkBandwidth {
+    pub fn new() -> Self {
+        Self(VecDeque::with_capacity(60))
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Find the highest speed recorded in the vecque
+    pub fn max(&self) -> BandwidthStat {
+        self.to_vec_f64()
+            .iter()
+            .map(|(_, speed)| *speed)
+            .max_by(|a, b| a.total_cmp(b))
+            .map(|m| BandwidthStat(m as u64))
+            .unwrap_or(BandwidthStat(0))
+    }
+
+    pub fn push(&mut self, x: u64) {
+        if self.0.len() >= 60 {
+            self.0.pop_front();
+        }
+        self.0.push_back(BandwidthStat(x));
+    }
+
+    /// Get the current total amount of traffic on a given device
+    pub fn current_total(&self) -> ByteStats {
+        self.0
+            .back()
+            .map_or(ByteStats::default(), |i| ByteStats::new(i.0))
+    }
+
+    /// Convert to f64 for use in the network graph
+    pub fn to_vec_f64(&self) -> Vec<(f64, f64)> {
+        self.0
+            .iter()
+            .zip(self.0.iter().skip(1))
+            .enumerate()
+            .map(|(i, (prev, current))| (i as f64, current.0.saturating_sub(prev.0) as f64))
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChartsData {
+    pub memory: ChartSeries<ByteStats>,
+    pub cpu: ChartSeries<CpuStats>,
+    pub rx: ChartSeries<BandwidthStat>,
+    pub tx: ChartSeries<BandwidthStat>,
+    pub state: State,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChartSeries<T: Stats> {
+    pub dataset: Vec<(f64, f64)>,
+    pub max: T,
+    pub current: T,
+}
 
 /// Used to make sure that each log entry, for each container, is unique,
 /// will only push a log entry into the logs vec if timestamp of said log entry isn't in the hashset
@@ -992,10 +1100,10 @@ pub struct ContainerItem {
     pub mem_stats: VecDeque<ByteStats>,
     pub name: ContainerName,
     pub ports: Vec<ContainerPorts>,
-    pub rx: ByteStats,
+    pub rx: NetworkBandwidth,
     pub state: State,
     pub status: ContainerStatus,
-    pub tx: ByteStats,
+    pub tx: NetworkBandwidth,
 }
 
 /// Basic display information, for when running in debug mode
@@ -1042,10 +1150,10 @@ impl ContainerItem {
             mem_stats: VecDeque::with_capacity(60),
             name: name.into(),
             ports,
-            rx: ByteStats::default(),
+            rx: NetworkBandwidth::new(),
             state,
             status,
-            tx: ByteStats::default(),
+            tx: NetworkBandwidth::new(),
         }
     }
 
@@ -1071,7 +1179,7 @@ impl ContainerItem {
         self.cpu_stats
             .iter()
             .enumerate()
-            .map(|i| (i.0 as f64, i.1.0))
+            .map(|(i, v)| (i as f64, v.0))
             .collect::<Vec<_>>()
     }
 
@@ -1081,24 +1189,65 @@ impl ContainerItem {
         self.mem_stats
             .iter()
             .enumerate()
-            .map(|i| (i.0 as f64, i.1.0 as f64))
+            .map(|(i, v)| (i as f64, v.0 as f64))
             .collect::<Vec<_>>()
     }
 
     /// Get all cpu chart data
-    fn get_cpu_chart_data(&self) -> CpuTuple {
-        (self.get_cpu_dataset(), self.max_cpu_stats(), self.state)
+    fn get_cpu_chart_data(&self) -> ChartSeries<CpuStats> {
+        ChartSeries {
+            dataset: self.get_cpu_dataset(),
+            max: self.max_cpu_stats(),
+            current: self
+                .cpu_stats
+                .back()
+                .map_or_else(|| CpuStats::new(0.0), |i| *i),
+        }
     }
 
     /// Get all mem chart data
-    fn get_mem_chart_data(&self) -> MemTuple {
-        (self.get_mem_dataset(), self.max_mem_stats(), self.state)
+    fn get_mem_chart_data(&self) -> ChartSeries<ByteStats> {
+        ChartSeries {
+            dataset: self.get_mem_dataset(),
+            max: self.max_mem_stats(),
+            current: self
+                .mem_stats
+                .back()
+                .map_or_else(|| ByteStats::new(0), |i| *i),
+        }
+    }
+
+    /// Get all mem chart data
+    /// Don't understand what we are doing here
+    fn get_bandwidth_chart_tx_data(&self) -> ChartSeries<BandwidthStat> {
+        let data = self.tx.to_vec_f64();
+        ChartSeries {
+            current: BandwidthStat(data.last().map_or(0, |i| i.1 as u64)),
+            dataset: data,
+            max: self.tx.max(),
+        }
+    }
+
+    /// Get all mem chart data
+    fn get_bandwidth_chart_rx_data(&self) -> ChartSeries<BandwidthStat> {
+        let data = self.rx.to_vec_f64();
+        ChartSeries {
+            current: BandwidthStat(data.last().map_or(0, |i| i.1 as u64)),
+            dataset: data,
+            max: self.rx.max(),
+        }
     }
 
     /// Get chart info for cpu & memory in one function
     /// So only need to call .lock() once
-    pub fn get_chart_data(&self) -> (CpuTuple, MemTuple) {
-        (self.get_cpu_chart_data(), self.get_mem_chart_data())
+    pub fn get_chart_data(&self) -> ChartsData {
+        ChartsData {
+            memory: self.get_mem_chart_data(),
+            cpu: self.get_cpu_chart_data(),
+            rx: self.get_bandwidth_chart_rx_data(),
+            tx: self.get_bandwidth_chart_tx_data(),
+            state: self.state,
+        }
     }
 }
 

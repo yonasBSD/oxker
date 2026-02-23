@@ -467,12 +467,14 @@ impl AppData {
                     Header::Rx => item_ord
                         .0
                         .rx
-                        .cmp(&item_ord.1.rx)
+                        .current_total()
+                        .cmp(&item_ord.1.rx.current_total())
                         .then_with(|| item_ord.0.name.get().cmp(item_ord.1.name.get())),
                     Header::Tx => item_ord
                         .0
                         .tx
-                        .cmp(&item_ord.1.tx)
+                        .current_total()
+                        .cmp(&item_ord.1.tx.current_total())
                         .then_with(|| item_ord.0.name.get().cmp(item_ord.1.name.get())),
                     Header::Name => item_ord
                         .0
@@ -610,7 +612,14 @@ impl AppData {
     }
 
     /// Get a mutable container by given id
+    #[cfg(not(test))]
     fn get_container_by_id(&mut self, id: &ContainerId) -> Option<&mut ContainerItem> {
+        self.containers.items.iter_mut().find(|i| &i.id == id)
+    }
+
+    /// As above, but make it public to testing
+    #[cfg(test)]
+    pub fn get_container_by_id(&mut self, id: &ContainerId) -> Option<&mut ContainerItem> {
         self.containers.items.iter_mut().find(|i| &i.id == id)
     }
 
@@ -790,7 +799,7 @@ impl AppData {
 
     /// Chart data related methods
     /// Get mutable Option of the currently selected container chart data
-    pub fn get_chart_data(&self) -> Option<(CpuTuple, MemTuple)> {
+    pub fn get_chart_data(&self) -> Option<ChartsData> {
         self.containers
             .state
             .selected()
@@ -839,6 +848,7 @@ impl AppData {
 
         for container in [&self.containers.items, &self.hidden_containers] {
             for container in container {
+                // TODO refactor these
                 let cpu_count = container.cpu_stats.back().map_or_else(
                     || count(&CpuStats::default().to_string()),
                     |i| count(&i.to_string()),
@@ -848,14 +858,19 @@ impl AppData {
                     || count(&ByteStats::default().to_string()),
                     |i| count(&i.to_string()),
                 );
-
                 columns.cpu.1 = columns.cpu.1.max(cpu_count);
                 columns.image.1 = columns.image.1.max(count(&container.image.to_string()));
                 columns.mem.1 = columns.mem.1.max(mem_current_count);
                 columns.mem.2 = columns.mem.2.max(count(&container.mem_limit.to_string()));
                 columns.name.1 = columns.name.1.max(count(&container.name.to_string()));
-                columns.net_rx.1 = columns.net_rx.1.max(count(&container.rx.to_string()));
-                columns.net_tx.1 = columns.net_tx.1.max(count(&container.tx.to_string()));
+                columns.net_rx.1 = columns
+                    .net_rx
+                    .1
+                    .max(count(&container.rx.current_total().to_string()));
+                columns.net_tx.1 = columns
+                    .net_tx
+                    .1
+                    .max(count(&container.tx.current_total().to_string()));
                 columns.state.1 = columns.state.1.max(count(&container.state.to_string()));
                 columns.status.1 = columns.status.1.max(count(container.status.get()));
             }
@@ -899,8 +914,12 @@ impl AppData {
                 container.mem_stats.push_back(ByteStats::new(mem));
             }
 
-            container.rx.update(rx);
-            container.tx.update(tx);
+            // Only insert if alive, or if is empty, need two to create an entry in the bandwidth chart, so instead this fills in the RX/TX total columns
+            if container.rx.is_empty() || container.state.is_alive() {
+                container.rx.push(rx);
+                container.tx.push(tx);
+            }
+
             container.mem_limit.update(mem_limit);
         }
         if self.is_selected_container(id) {
@@ -1336,13 +1355,16 @@ mod tests {
         assert_eq!(result, &containers);
 
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("1")) {
-            i.rx = ByteStats::new(40);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(40);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("2")) {
-            i.rx = ByteStats::new(80);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(80);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("3")) {
-            i.rx = ByteStats::new(2);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(2);
         }
 
         // descending
@@ -1373,13 +1395,16 @@ mod tests {
         assert_eq!(result, &containers);
 
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("1")) {
-            i.rx = ByteStats::new(400);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(400);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("2")) {
-            i.rx = ByteStats::new(80);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(80);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("3")) {
-            i.rx = ByteStats::new(83);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(83);
         }
 
         // descending
@@ -1437,13 +1462,16 @@ mod tests {
         assert_eq!(result, &containers);
 
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("1")) {
-            i.rx = ByteStats::new(400);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(400);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("2")) {
-            i.rx = ByteStats::new(80);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(80);
         }
         if let Some(i) = app_data.get_container_by_id(&ContainerId::from("3")) {
-            i.rx = ByteStats::new(83);
+            i.rx = NetworkBandwidth::new();
+            i.rx.push(83);
         }
 
         app_data.set_sorted(Some((Header::Rx, SortedOrder::Asc)));
@@ -2223,26 +2251,49 @@ mod tests {
 
         app_data.containers_start();
 
+        let mut rx = NetworkBandwidth::new();
+        rx.push(200);
+        rx.push(100);
+        rx.push(200);
+
+        let mut tx = NetworkBandwidth::new();
+        tx.push(300);
+        tx.push(600);
+        tx.push(900);
+
         if let Some(item) = app_data.get_container_by_id(&ContainerId::from("1")) {
-            item.cpu_stats = VecDeque::from([CpuStats::new(1.1), CpuStats::new(1.2)]);
+            item.cpu_stats = VecDeque::from([CpuStats::new(1.2), CpuStats::new(1.2)]);
             item.mem_stats = VecDeque::from([ByteStats::new(1), ByteStats::new(2)]);
+            item.rx = rx;
+            item.tx = tx;
         }
 
         let result = app_data.get_chart_data();
         assert_eq!(
             result,
-            Some((
-                (
-                    vec![(0.0, 1.1), (1.0, 1.2)],
-                    CpuStats::new(1.2),
-                    State::Running(RunningState::Healthy),
-                ),
-                (
-                    vec![(0.0, 1.0), (1.0, 2.0)],
-                    ByteStats::new(2),
-                    State::Running(RunningState::Healthy),
-                )
-            ))
+            Some(ChartsData {
+                memory: ChartSeries {
+                    dataset: vec![(0.0, 1.0), (1.0, 2.0)],
+                    max: ByteStats::new(2),
+                    current: ByteStats::new(2)
+                },
+                cpu: ChartSeries {
+                    dataset: vec![(0.0, 1.2), (1.0, 1.2)],
+                    max: CpuStats::new(1.2),
+                    current: CpuStats::new(1.2)
+                },
+                rx: ChartSeries {
+                    dataset: vec![(0.0, 0.0), (1.0, 100.0)],
+                    max: BandwidthStat::new(100),
+                    current: BandwidthStat::new(100)
+                },
+                tx: ChartSeries {
+                    dataset: vec![(0.0, 300.0), (1.0, 300.0)],
+                    max: BandwidthStat::new(300),
+                    current: BandwidthStat::new(300)
+                },
+                state: State::Running(RunningState::Healthy)
+            })
         );
     }
 
@@ -2392,8 +2443,15 @@ mod tests {
         assert_eq!(result[0].cpu_stats, VecDeque::from([CpuStats::new(10.0)]));
         assert_eq!(result[0].mem_stats, VecDeque::from([ByteStats::new(10)]));
         assert_eq!(result[0].mem_limit, ByteStats::new(10));
-        assert_eq!(result[0].rx, ByteStats::new(10));
-        assert_eq!(result[0].tx, ByteStats::new(10));
+
+        let mut rx = NetworkBandwidth::new();
+        rx.push(10);
+        let mut tx = NetworkBandwidth::new();
+        tx.push(10);
+        assert_eq!(result[0].rx, rx);
+        // VecDeque::from([ByteStats::new(10)]));
+        assert_eq!(result[0].tx, tx);
+        // VecDeque::from([ByteStats::new(10)]));
     }
 
     #[test]

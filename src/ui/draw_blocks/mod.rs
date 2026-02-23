@@ -11,7 +11,8 @@ use crate::config::AppColors;
 
 use super::{FrameData, GuiState, SelectablePanel, Status, gui_state::Region};
 
-pub mod charts;
+pub mod chart_bandwidth;
+pub mod chart_cpu_mem;
 pub mod commands;
 pub mod containers;
 pub mod delete_confirm;
@@ -39,7 +40,6 @@ pub const REPO: &str = env!("CARGO_PKG_REPOSITORY");
 pub const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 pub const MARGIN: &str = "   ";
 pub const SELECT_ARROW: &str = "▶ ";
-// TODO use me all over the place
 pub const LEFT_ARROW: &str = "←";
 pub const RIGHT_ARROW: &str = "→";
 pub const DOWN_ARROW: &str = "↓";
@@ -246,7 +246,7 @@ pub mod tests {
 
     #[allow(clippy::cast_precision_loss)]
     // Add fixed data to the cpu & mem vecdeques
-    pub fn insert_chart_data(setup: &TuiTestSetup) {
+    pub fn insert_all_chart_data(setup: &TuiTestSetup) {
         for i in 1..=10 {
             setup.app_data.lock().update_stats_by_id(
                 &setup.ids[0],
@@ -277,7 +277,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout() {
         let mut setup = test_setup(160, 30, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -305,7 +305,7 @@ pub mod tests {
     /// Check that the whole layout is drawn correctly
     fn test_draw_blocks_whole_layout_with_filter_bar() {
         let mut setup = test_setup(160, 30, true, true);
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
 
         setup.app_data.lock().containers.items[1]
@@ -341,7 +341,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_long_name() {
         let mut setup = test_setup(190, 30, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -374,7 +374,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_no_logs() {
         let mut setup = test_setup(160, 30, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -403,7 +403,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_short_height_logs() {
         let mut setup = test_setup(160, 30, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -435,7 +435,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_help_panel() {
         let mut setup = test_setup(160, 40, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -465,7 +465,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_error() {
         let mut setup = test_setup(160, 40, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -499,7 +499,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_delete() {
         let mut setup = test_setup(160, 40, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports
@@ -531,7 +531,7 @@ pub mod tests {
     fn test_draw_blocks_whole_layout_info_box() {
         let mut setup = test_setup(160, 40, true, true);
 
-        insert_chart_data(&setup);
+        insert_all_chart_data(&setup);
         insert_logs(&setup);
         setup.app_data.lock().containers.items[0]
             .ports

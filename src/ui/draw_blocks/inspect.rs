@@ -134,11 +134,6 @@ pub fn draw(
     f.render_widget(paragraph, rect);
 }
 
-// TODO TESTS
-// Test keymap
-// Test colors
-// Test offset y & x
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {

@@ -30,8 +30,8 @@ pub use self::color_match::*;
 pub use self::gui_state::{DeleteButton, GuiState, SelectablePanel, Status};
 use crate::{
     app_data::{
-        AppData, Columns, ContainerId, ContainerPorts, CpuTuple, FilterBy, Header, LogSearch,
-        MemTuple, SortedOrder, State,
+        AppData, ChartsData, Columns, ContainerId, ContainerPorts, FilterBy, Header, LogSearch,
+        SortedOrder, State,
     },
     app_error::AppError,
     config::{AppColors, Keymap},
@@ -301,7 +301,7 @@ impl Ui {
 #[derive(Debug, Clone)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct FrameData {
-    chart_data: Option<(CpuTuple, MemTuple)>,
+    chart_data: Option<ChartsData>,
     color_logs: bool,
     columns: Columns,
     container_title: String,
@@ -462,7 +462,14 @@ fn draw_frame(
                 .constraints([Constraint::Min(1), Constraint::Max(ports_len)])
                 .split(upper_main[1]);
 
-            draw_blocks::charts::draw(lower[0], colors, f, fd);
+            let charts_rect = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(66), Constraint::Percentage(33)])
+                .split(lower[0]);
+
+            draw_blocks::chart_cpu_mem::draw(charts_rect[0], colors, f, fd);
+            draw_blocks::chart_bandwidth::draw(charts_rect[1], colors, f, fd);
+
             draw_blocks::ports::draw(lower[1], colors, f, fd);
         }
 

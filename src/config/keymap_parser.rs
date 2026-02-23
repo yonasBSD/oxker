@@ -441,8 +441,7 @@ mod tests {
             exec: gen_v(("g", "h")),
             filter_mode: gen_v(("i", "j")),
             force_redraw: gen_v(("k", "l")),
-            // TODO test me
-            inspect: None,
+            inspect: gen_v(("m", "n")),
             scroll_back: gen_v(("s", "t")),
             scroll_forward: gen_v(("q", "r")),
             log_search_mode: gen_v(("1", "2")),
@@ -481,7 +480,6 @@ mod tests {
             exec: (KeyCode::Char('g'), Some(KeyCode::Char('h'))),
             filter_mode: (KeyCode::Char('i'), Some(KeyCode::Char('j'))),
             force_redraw: (KeyCode::Char('k'), Some(KeyCode::Char('l'))),
-            //todo test me
             inspect: (KeyCode::Char('i'), None),
             scroll_back: (KeyCode::Char('s'), Some(KeyCode::Char('t'))),
             scroll_forward: (KeyCode::Char('q'), Some(KeyCode::Char('r'))),

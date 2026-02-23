@@ -190,7 +190,6 @@ mod tests {
                     AppColors::new(),
                     &AppError::DockerExec,
                     f,
-                    // TODO test me
                     None,
                     &Keymap::new(),
                     Some(4),
@@ -229,7 +228,6 @@ mod tests {
         setup
             .terminal
             .draw(|f| {
-                // TODO test me
                 super::draw(
                     colors,
                     &AppError::DockerExec,
@@ -272,7 +270,6 @@ mod tests {
         setup
             .terminal
             .draw(|f| {
-                // TODO test me
                 super::draw(
                     AppColors::new(),
                     &AppError::DockerExec,
@@ -297,7 +294,6 @@ mod tests {
         setup
             .terminal
             .draw(|f| {
-                // TODO test me
                 super::draw(
                     AppColors::new(),
                     &AppError::DockerExec,
@@ -322,7 +318,6 @@ mod tests {
         setup
             .terminal
             .draw(|f| {
-                // TODO test me
                 super::draw(
                     AppColors::new(),
                     &AppError::DockerExec,
